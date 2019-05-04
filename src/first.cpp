@@ -160,5 +160,20 @@ int main (int ArgCount, char* Args[])
     Assert(!ADEquality);
     Assert(!AEEquality);
     
+    string CatStringA = AllocStringFromStringArena(256, &StringArena);
+    SetStringToCharArray(&CatStringA, "Hello ");
+    string CatStringB = AllocStringFromStringArena(512, &StringArena);
+    SetStringToCharArray(&CatStringB, "Sailor!");
+    string CatStringResult = AllocStringFromStringArena(512, &StringArena);
+    SetStringToCharArray(&CatStringResult, "Hello Sailor!");
+    ConcatString(&CatStringA, CatStringB);
+    Assert(StringsEqual(CatStringA, CatStringResult));
+    
+    int32_t FirstSpaceIndex = FindFirstChar(CatStringA, ' ');
+    Assert(FirstSpaceIndex == 5);
+    
+    SetStringToChar(&CatStringB, 'B', 5);
+    Assert(StringEqualsCharArray(CatStringB, "BBBBB"));
+    
     return 0;
 }

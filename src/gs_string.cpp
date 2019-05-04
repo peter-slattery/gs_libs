@@ -1,3 +1,52 @@
+// Utility
+static int32_t GSStringMin (int32_t A, int32_t B); 
+static int32_t GSStringAbs (int32_t A); 
+static float   GSStringAbsF (float A);
+static float   GSStringPowF (float N, int32_t Power);
+
+// Setup
+static void   InitializeString (string* String, char* Data, int32_t DataSize);
+static string InitializeString (char* Data, int32_t DataSize);
+static void   ClearString (string* String);
+
+// Char/Char Array
+static bool     IsSlash (char C);
+static bool     IsNewline (char C);
+static bool     IsWhitespace (char C);
+static bool     IsAlpha (char C);
+static bool     IsUpper (char C);
+static bool     IsLower (char C);
+static bool     IsNumeric (char C);
+static bool     ToUpper (char C);
+static bool     ToLower (char C);
+static bool     IsAlphaNumeric (char C);
+static uint32_t CharToUInt (char C);
+static bool     CharArraysEqual (char* A, int32_t ALength, char* B, int32_t BLength);
+static void     ReverseCharArray (char* Array, int32_t Length);
+
+// String
+static bool    StringsEqual (string A, string B);
+static bool    StringEqualsCharArray (string String, char* CharArray);
+static int32_t FindFirstChar (string String, char C);
+static void    SetStringToChar (string* Dest, char C, int32_t Count);
+static void    SetStringToCharArray (string* Dest, char* Source);
+static void    ConcatString (string* Dest, string Source);
+static void    ConcatString (string* Dest, string Source, int32_t Length);
+static void    CopyStringTo (string Source, string* Dest);
+static void    CopyCharArray (char* Source, char* Dest, int32_t DestLength);
+static void    InsertChar (string* String, char Char, int32_t Index);
+static void    RemoveCharAt (string* String, int32_t Index);
+static string  Substring (string* String, int32_t Start, int32_t End);
+
+// Parsing
+static uint32_t ParseUnsignedInt (char* String, int32_t Length);
+static int32_t  UIntToString (uint32_t Int, char* String, int32_t Length);
+static int32_t  ParseSignedInt (char* String, int32_t Length);
+static int32_t  IntToString (int32_t Int, char* String, int32_t Length);
+static int32_t  IntToString (int32_t Int, char* String, int32_t Length, int32_t Offset);
+static float    ParseFloat (char* String, int32_t Length);
+static int32_t  FloatToString(float Float, char *String, int32_t Length, int32_t AfterPoint);
+
 ////////////////////////////////////////////////////////////////
 //        String Utility Functions
 ////////////////////////////////////////////////////////////////
@@ -62,6 +111,7 @@ ClearString (string* String)
 //        Basic Char Operations
 ////////////////////////////////////////////////////////////////
 
+static bool IsSlash (char C) { return ((C == '\\') || (C == '/')); }
 static bool IsNewline (char C) { return (C == '\n') || (C == '\r'); }
 static bool IsWhitespace (char C) { return (C == ' ') || (C == '\t') || IsNewline(C); }
 static bool IsAlpha (char C)
@@ -151,6 +201,102 @@ StringsEqual (string A, string B)
     }
     
     return Result;
+}
+
+static bool
+StringEqualsCharArray (string String, char* CharArray)
+{
+    bool Result = true;
+    
+    char* S = String.Data;
+    char* C = CharArray;
+    
+    int32_t Count = 0;
+    while (*C && Count < String.Length)
+    {
+        if (*C++ != *S++)
+        {
+            Result = false;
+            break;
+        }
+        Count++;
+    }
+    
+    return Result;
+}
+
+static int32_t
+FindFirstChar (string String, char C)
+{
+    int32_t Result = -1;
+    
+    char* Iter = String.Data;
+    for (int i = 0; i < String.Length; i++)
+    {
+        if (*Iter++ == C)
+        {
+            Result = i;
+            break;
+        }
+    }
+    
+    return Result;
+}
+
+static void
+SetStringToChar (string* Dest, char C, int32_t Count)
+{
+    Assert(Count <= Dest->Max);
+    
+    char* Iter = Dest->Data;
+    for (int i = 0; i < Count; i++)
+    {
+        *Iter++ = C;
+    }
+    Dest->Length = Count;
+}
+
+static void
+SetStringToCharArray (string* Dest, char* Source)
+{
+    Dest->Length = 0;
+    
+    char* Src = Source;
+    char* Dst = Dest->Data;
+    while (*Src && Dest->Length < Dest->Max)
+    {
+        *Dst++ = *Src++;
+        Dest->Length++;
+    }
+}
+
+static void
+ConcatString (string* Dest, string Source)
+{
+    Assert((Dest->Length + Source.Length) <= Dest->Max);
+    
+    char* Dst = Dest->Data + Dest->Length;
+    char* Src = Source.Data;
+    for (int32_t i = 0; i < Source.Length; i++)
+    {
+        *Dst++ = *Src++;
+        Dest->Length++;
+    }
+}
+
+static void
+ConcatString (string* Dest, string Source, int32_t Length)
+{
+    Assert(Length < Source.Length);
+    Assert((Dest->Length + Length) <= Dest->Max);
+    
+    char* Dst = Dest->Data + Dest->Length;
+    char* Src = Source.Data;
+    for (int32_t i = 0; i < Length; i++)
+    {
+        *Dst++ = *Src++;
+        Dest->Length++;
+    }
 }
 
 static void
