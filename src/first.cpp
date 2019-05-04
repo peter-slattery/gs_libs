@@ -1,14 +1,9 @@
-#include <stdlib.h>
-#include <stdint.h>
-
+#include "gs_language.h"
 #include "gs_string.h"
-#include "gs_string.cpp"
-#include "gs_string_memory.h"
-#include "gs_string_memory.cpp"
 
 slot_arena StringArena = {};
 
-void PrintChars (string* String, int32_t Count)
+void PrintChars (string* String, s32 Count)
 {
     char* Iter = String->Data;
     for (int i = 0; i < Count; i++)
@@ -18,7 +13,11 @@ void PrintChars (string* String, int32_t Count)
     String->Length = Count;
 }
 
-int main (int ArgCount, char* Args[])
+int CALLBACK
+WinMain (HINSTANCE HInstance,
+         HINSTANCE HPrevInstance,
+         LPSTR CommandLine, 
+         int ShowCode)
 {
     ////////////////////////////////////////////////////////////////
     //    Char Functions
@@ -32,16 +31,16 @@ int main (int ArgCount, char* Args[])
     Assert(CharArraysEqual(ForwardArray, 13, BackwardArray, 13));
     
     char UIntString[] = "1234";
-    uint32_t UIntValue = 1234;
-    uint32_t ParsedUInt = ParseUnsignedInt(UIntString, 4);
+    u32 UIntValue = 1234;
+    u32 ParsedUInt = ParseUnsignedInt(UIntString, 4);
     Assert(ParsedUInt == UIntValue);
     char StringifiedUInt[4] = {};
     UIntToString(UIntValue, StringifiedUInt, 4);
     Assert(CharArraysEqual(UIntString, 4, StringifiedUInt, 4));
     
     char IntString[] = "-1234";
-    int32_t IntValue = -1234;
-    int32_t ParsedInt = ParseSignedInt(IntString, 5);
+    s32 IntValue = -1234;
+    s32 ParsedInt = ParseSignedInt(IntString, 5);
     Assert(ParsedInt == IntValue);
     char StringifiedInt[5] = {};
     IntToString(IntValue, StringifiedInt, 5);
@@ -60,11 +59,11 @@ int main (int ArgCount, char* Args[])
     
     StringArena.SlotSize = 256;
     StringArena.SlotCount = 32;
-    StringArena.Memory = (uint8_t*)malloc(StringArena.SlotSize * StringArena.SlotCount);
+    StringArena.Memory = Allocate(StringArena.SlotSize * StringArena.SlotCount);
     slot_header* PrevSlotHeader = 0;
     for (int i = StringArena.SlotCount - 1; i >= 0; i--)
     {
-        uint8_t* SlotBase = StringArena.Memory + (i * StringArena.SlotSize);
+        u8* SlotBase = StringArena.Memory + (i * StringArena.SlotSize);
         slot_header* SlotHeader = (slot_header*)SlotBase;
         SlotHeader->Size = StringArena.SlotSize;
         SlotHeader->Next = PrevSlotHeader;
@@ -78,7 +77,7 @@ int main (int ArgCount, char* Args[])
     StringArena.FreeList = PrevSlotHeader;
     
     // TEST(peter): Count Should equal StringArena.SlotCount
-    int32_t ContiguousSlotsCountBefore = CountContiguousSlots(StringArena.FreeList).Count;
+    s32 ContiguousSlotsCountBefore = CountContiguousSlots(StringArena.FreeList).Count;
     Assert(ContiguousSlotsCountBefore == StringArena.SlotCount);
     
     // TEST(peter): Should be false
@@ -86,7 +85,7 @@ int main (int ArgCount, char* Args[])
     Contiguity = SlotsAreContiguous(StringArena.FreeList->Next->Next, StringArena.FreeList);
     Assert(!Contiguity);
     
-    int32_t Slots = CalculateSlotCountFromSize(10, 256);
+    s32 Slots = CalculateSlotCountFromSize(10, 256);
     Assert(Slots == 1);
     Slots = CalculateSlotCountFromSize(256, 256);
     Assert(Slots == 1);
@@ -104,7 +103,7 @@ int main (int ArgCount, char* Args[])
     
 #if 0
     // TEST(peter): Should Assert
-    uint8_t* RandomMemory = (uint8_t*)malloc(256);
+    u8* RandomMemory = (u8*)malloc(256);
     string RandomMemString = {};
     RandomMemString.Data = (char*)RandomMemory;
     RandomMemString.Max = 256;
@@ -113,7 +112,7 @@ int main (int ArgCount, char* Args[])
     FreeToStringArena(&StringA, &StringArena);
     FreeToStringArena(&StringB, &StringArena);
     // TEST(peter): After freeing both allocations, ContiguousSlotCountBefore and ContiguousSlotCountAfter should be equal
-    int32_t ContiguousSlotCountAfter = CountContiguousSlots(StringArena.FreeList).Count;
+    s32 ContiguousSlotCountAfter = CountContiguousSlots(StringArena.FreeList).Count;
     Assert(ContiguousSlotCountAfter == ContiguousSlotsCountBefore);
     
     // TEST(peter): Set up a free list where the first element is too small, so it has to traverse to find an appropriately
@@ -122,7 +121,7 @@ int main (int ArgCount, char* Args[])
     StringA = AllocStringFromStringArena(256, &StringArena);
     StringB = AllocStringFromStringArena(256, &StringArena);
     FreeToStringArena(&StringA, &StringArena);
-    uint32_t Contiguous = CountContiguousSlots(StringArena.FreeList).Count; // Should = 1;
+    u32 Contiguous = CountContiguousSlots(StringArena.FreeList).Count; // Should = 1;
     string StringC = AllocStringFromStringArena(512, &StringArena);
     slot_header* HeaderC = (slot_header*)(StringC.Data);
     
@@ -169,11 +168,17 @@ int main (int ArgCount, char* Args[])
     ConcatString(&CatStringA, CatStringB);
     Assert(StringsEqual(CatStringA, CatStringResult));
     
-    int32_t FirstSpaceIndex = FindFirstChar(CatStringA, ' ');
+    s32 FirstSpaceIndex = FindFirstChar(CatStringA, ' ');
     Assert(FirstSpaceIndex == 5);
     
     SetStringToChar(&CatStringB, 'B', 5);
     Assert(StringEqualsCharArray(CatStringB, "BBBBB"));
     
     return 0;
+}
+
+void WinMainCRTStartup()
+{
+    int Result = WinMain(GetModuleHandle(0), 0, 0, 0);
+    ExitProcess(Result);
 }
