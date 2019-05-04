@@ -124,8 +124,7 @@ AllocStringFromStringArena (string* String, int32_t Size, slot_arena* Storage)
     if (Slot)
     {
         String->Data = (char*)Slot;
-        //ZeroMemory(Result, SlotCount * Storage->SlotSize);
-        
+        ZeroMemory((uint8_t*)String->Data, SlotCount * Storage->SlotSize);
         String->Max = SlotCount * Storage->SlotSize;
         String->Length = 0;
     }

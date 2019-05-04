@@ -2,7 +2,6 @@ struct slot_header
 {
     slot_header* Next;
     int32_t Size;
-    int32_t TestValue;
 };
 
 struct slot_arena

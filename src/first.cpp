@@ -15,10 +15,49 @@ void PrintChars (string* String, int32_t Count)
     {
         *Iter++ = (char)('A' + i);
     }
+    String->Length = Count;
 }
 
 int main (int ArgCount, char* Args[])
 {
+    ////////////////////////////////////////////////////////////////
+    //    Char Functions
+    
+    char ForwardArray[] = "Hello, Sailor";
+    char BackwardArray[] = "roliaS ,olleH";
+    Assert(CharArraysEqual(ForwardArray, 13, ForwardArray, 13));
+    Assert(!CharArraysEqual(ForwardArray, 13, BackwardArray, 13));
+    
+    ReverseCharArray(ForwardArray, 13);
+    Assert(CharArraysEqual(ForwardArray, 13, BackwardArray, 13));
+    
+    char UIntString[] = "1234";
+    uint32_t UIntValue = 1234;
+    uint32_t ParsedUInt = ParseUnsignedInt(UIntString, 4);
+    Assert(ParsedUInt == UIntValue);
+    char StringifiedUInt[4] = {};
+    UIntToString(UIntValue, StringifiedUInt, 4);
+    Assert(CharArraysEqual(UIntString, 4, StringifiedUInt, 4));
+    
+    char IntString[] = "-1234";
+    int32_t IntValue = -1234;
+    int32_t ParsedInt = ParseSignedInt(IntString, 5);
+    Assert(ParsedInt == IntValue);
+    char StringifiedInt[5] = {};
+    IntToString(IntValue, StringifiedInt, 5);
+    Assert(CharArraysEqual(IntString, 5, StringifiedInt, 5));
+    
+    char FloatString[] = "-1234.125";
+    float FloatValue = -1234.125f;
+    float ParsedFloat = ParseFloat(FloatString, 8);
+    Assert(ParsedFloat == FloatValue);
+    char StringifiedFloat[10] = {};
+    FloatToString(FloatValue, StringifiedFloat, 10, 3);
+    Assert(CharArraysEqual(FloatString, 8, StringifiedFloat, 8));
+    
+    ////////////////////////////////////////////////////////////////
+    //
+    
     StringArena.SlotSize = 256;
     StringArena.SlotCount = 32;
     StringArena.Memory = (uint8_t*)malloc(StringArena.SlotSize * StringArena.SlotCount);
@@ -29,7 +68,6 @@ int main (int ArgCount, char* Args[])
         slot_header* SlotHeader = (slot_header*)SlotBase;
         SlotHeader->Size = StringArena.SlotSize;
         SlotHeader->Next = PrevSlotHeader;
-        SlotHeader->TestValue = i;
         
         // TEST(peter): Should be true always, except on the first iteration, when there is no next slot
         bool Contiguity = SlotsAreContiguous(SlotHeader, PrevSlotHeader);
@@ -49,20 +87,20 @@ int main (int ArgCount, char* Args[])
     Assert(!Contiguity);
     
     int32_t Slots = CalculateSlotCountFromSize(10, 256);
+    Assert(Slots == 1);
     Slots = CalculateSlotCountFromSize(256, 256);
+    Assert(Slots == 1);
     Slots = CalculateSlotCountFromSize(345, 256);
+    Assert(Slots == 2);
     Slots = CalculateSlotCountFromSize(1024, 256);
+    Assert(Slots == 4);
     
     slot_header* HeaderTen = GetSlotAtOffset(StringArena.FreeList, 10);
     slot_header* HeaderThree = GetSlotAtOffset(StringArena.FreeList, 3);
     slot_header* HeaderFive = GetSlotAtOffset(StringArena.FreeList, 5);
     
-    // TEST(peter): After this, StringArena.FreeList->TestValue Should Equal 1
     string StringA = AllocStringFromStringArena(10, &StringArena);
-    Assert(StringArena.FreeList->TestValue == 1);
-    // TEST(peter): After this, StringArena.FreeList->TestValue Should Equal 3
     string StringB = AllocStringFromStringArena(345, &StringArena);
-    Assert(StringArena.FreeList->TestValue == 3);
     
 #if 0
     // TEST(peter): Should Assert
@@ -87,7 +125,6 @@ int main (int ArgCount, char* Args[])
     uint32_t Contiguous = CountContiguousSlots(StringArena.FreeList).Count; // Should = 1;
     string StringC = AllocStringFromStringArena(512, &StringArena);
     slot_header* HeaderC = (slot_header*)(StringC.Data);
-    Assert(HeaderC->TestValue == 2);
     
     string ReallocTestString = AllocStringFromStringArena(256, &StringArena);
     PrintChars(&ReallocTestString, 24);
@@ -100,6 +137,28 @@ int main (int ArgCount, char* Args[])
     PrintChars(&TestString, TestString.Max);
     ReallocFromStringArena(&TestString, 10, &StringArena);
     FreeToStringArena(&TestString, &StringArena);
+    
+    string EqualityStringA = AllocStringFromStringArena(345, &StringArena);
+    string EqualityStringB = AllocStringFromStringArena(415, &StringArena);
+    // Equality should succeed despite length differences
+    string EqualityStringC = AllocStringFromStringArena(256, &StringArena); 
+    string EqualityStringD = AllocStringFromStringArena(256, &StringArena); // Equality should fail
+    string EqualityStringEmpty = {};
+    
+    PrintChars(&EqualityStringA, 24);
+    PrintChars(&EqualityStringB, 24);
+    PrintChars(&EqualityStringC, 24);
+    PrintChars(&EqualityStringD, 12);
+    
+    bool ABEquality = StringsEqual(EqualityStringA, EqualityStringB); // Should Succeed
+    bool ACEquality = StringsEqual(EqualityStringA, EqualityStringC); // Should Succeed
+    bool ADEquality = StringsEqual(EqualityStringA, EqualityStringD); // Should Fail
+    bool AEEquality = StringsEqual(EqualityStringA, EqualityStringEmpty); // Should Fail
+    
+    Assert(ABEquality);
+    Assert(ACEquality);
+    Assert(!ADEquality);
+    Assert(!AEEquality);
     
     return 0;
 }
