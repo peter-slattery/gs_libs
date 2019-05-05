@@ -2,6 +2,8 @@
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__WIN32__)
 #include <windows.h>
+// TODO(Peter): Get rid of stdio
+#include <stdio.h>
 
 #elif defined(__APPLE__) && defined(__MAC__)
 // TODO(Peter): 
@@ -10,6 +12,8 @@
 #include <stdlib.h>
 
 #endif
+
+#include <math.h>
 
 #define internal static
 #define local_persist static
@@ -64,11 +68,16 @@ typedef double r64;
 #define Gigabytes(Value) (Megabytes(Value) * 1024)
 #define Terabytes(Value) (Gigabytes(Value) * 1024)
 
+#define M_PI  3.14159265359
+#define PI_OVER_180 0.01745329251f
+
 #define GS_TYPES
 #endif
 
 
 #ifdef DEBUG
+
+static void DebugPrint(char* Format, ...);
 
 #if !defined(Assert)
 // NOTE(peter): this writes to address 0 which is always illegal and will cause a crash
@@ -78,13 +87,31 @@ typedef double r64;
 #define InvalidCodePath Assert(0);
 #define STBI_ASSERT(x) Assert(x)
 
+// TODO(Peter): this isn't great 
+#define DEBUG_TRACK_SCOPE(a)
+
+
+#define TestClean(v, c) SuccessCount += Test(v, c, &TestCount)
+internal s32
+Test(b32 Result, char* Description, s32* Count)
+{
+    char* Passed = (Result ? "Success" : "Failed");
+    if (!Result)
+        DebugPrint("%s:\n................................................%s\n\n", Description, Passed);
+    
+    *Count = *Count + 1;
+    return (Result ? 1 : 0);
+}
+
 #else
 
 #define Assert(expression)
 #define InvalidCodePath
+#define DEBUG_TRACK_SCOPE(a)
 
 #endif // DEBUG
 
+#ifndef GS_LANGUAGE_MATH
 
 static void
 GSZeroMemory (u8* Memory, s32 Size)
@@ -118,6 +145,35 @@ GSMaxDef(r32)
 GSMaxDef(r64)
 #undef GSMaxDef
 
+#define GSClampDef(type) static type GSClamp(type Min, type V, type Max) { \
+        type Result = V; \
+        if (V < Min) { Result = Min; } \
+        if (V > Max) { Result = Max; } \
+        return Result; \
+}
+GSClampDef(s8)
+GSClampDef(s16)
+GSClampDef(s32)
+GSClampDef(s64)
+GSClampDef(u8)
+GSClampDef(u16)
+GSClampDef(u32)
+GSClampDef(u64)
+GSClampDef(r32)
+GSClampDef(r64)
+#undef GSClampDef
+
+#define GSClamp01Def(type) static type GSClamp01(type V) { \
+        type Min = 0; type Max = 1; \
+        type Result = V; \
+        if (V < Min) { Result = Min; } \
+        if (V > Max) { Result = Max; } \
+        return Result; \
+}
+GSClamp01Def(r32)
+GSClamp01Def(r64)
+#undef GSClamp01Def
+
 #define GSAbsDef(type) static type GSAbs(type A) { return (A < 0 ? -A : A); }
 GSAbsDef(s8)
 GSAbsDef(s16)
@@ -144,6 +200,21 @@ GSPowDef(r32)
 GSPowDef(r64)
 #undef GSPowDef
 
+
+#define GSLerpDef(type) type GSLerp(type A, type B, type Percent) { return (A * (1.0f - Percent))+(B * Percent);}
+GSLerpDef(r32)
+GSLerpDef(r64)
+#undef GSLerpDef
+
+static r32 GSSqrt(r32 V) { return sqrtf(V); }
+static r64 GSSqrt(r64 V) { return sqrt(V); }
+
+static r32 DegreesToRadians (r32 Degrees) { return Degrees * PI_OVER_180; }
+static r64 DegreesToRadians (r64 Degrees) { return Degrees * PI_OVER_180; }
+
+#define GS_LANGUAGE_MATH
+#endif // GS_LANGUAGE_MATH
+
 #if defined(_WIN32) || defined(_WIN64) || defined(__WIN32__)
 
 internal u8* Allocate (s32 Size) 
@@ -158,6 +229,31 @@ internal b32 Free (u8* Base, u32 Size)
     b32 Result = false;
     Result = VirtualFree(Base, Size, MEM_RELEASE);
     return Result;
+}
+
+#if defined(DEBUG)
+internal void
+DebugPrint (char* Format, ...)
+{
+    char Buffer[256];
+    va_list Args;
+    va_start(Args, Format);
+    // TODO(Peter): get rid of this
+    vsnprintf(Buffer, 256, Format, Args);
+    OutputDebugStringA(Buffer);
+    va_end(Args);
+}
+#endif
+
+internal void
+PrintF (char* Format, ...)
+{
+    char Buffer[256];
+    va_list Args;
+    va_start(Args, Format);
+    // TODO(Peter): get rid of this
+    printf(Buffer, 256, Format, Args);
+    va_end(Args);
 }
 
 #elif defined(__APPLE__) && defined(__MAC__)
@@ -191,6 +287,8 @@ internal void Free (u8* Base, u32 Size)
 }
 
 #endif
+
+
 
 #define GS_LANGUAGE_H
 #endif

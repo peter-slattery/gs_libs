@@ -1,57 +1,3 @@
-
-#ifdef DEBUG
-#ifndef Assert
-#define Assert(condition) if (!(condition)) { *((int*)0) = 5; }
-#endif
-#endif
-
-#ifdef USE_STD_INT
-#include <stdint.h>
-
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
-typedef int8_t  s8;
-typedef int16_t s16;
-typedef int32_t s32;
-typedef int64_t s64;
-
-#elif !defined(GS_TYPES)
-
-#define GSINT64(s) (s) ## L
-#define GSUINT64(s) (s) ## UL
-
-typedef unsigned char          u8;
-typedef unsigned short int     u16;
-typedef unsigned int           u32;
-typedef unsigned long long int u64;
-
-typedef signed char   s8;
-typedef short int     s16;
-typedef int           s32;
-typedef long long int s64;
-
-#define INT8_MIN   (-128)
-#define INT16_MIN  (-32767-1)
-#define INT32_MIN  (-2147483647-1)
-#define INT64_MIN  (-GSINT64(9223372036854775807)-1)
-
-#define INT8_MAX   (127)
-#define INT16_MAX  (32767)
-#define INT32_MAX  (2147483647)
-#define INT64_MAX  (GSINT64(9223372036854775807))
-
-#define UINT8_MAX  (255)
-#define UINT16_MAX (65535)
-#define UINT32_MAX (4294967295U)
-#define UINT64_MAX (GSUINT64(18446744073709551615))
-
-#define GS_TYPES
-#endif
-
-
 ////////////////////////////////////////////////////////////////
 //        String 
 ////////////////////////////////////////////////////////////////
@@ -875,3 +821,186 @@ ReallocFromStringArena (string* String, s32 NewSize, slot_arena* Storage)
     FreeToStringArena(String, Storage);
     *String = NewString;
 }
+
+#if defined(DEBUG)
+
+void DEBUGPrintChars (string* String, s32 Count)
+{
+    char* Iter = String->Data;
+    for (int i = 0; i < Count; i++)
+    {
+        *Iter++ = (char)('A' + i);
+    }
+    String->Length = Count;
+}
+
+static void
+TestStrings()
+{
+    
+    slot_arena StringArena = {};
+    
+    s32 TestCount = 0;
+    s32 SuccessCount = 0;
+    
+    DebugPrint("\n\n-------------------------------------------------\n  Begin Testing Strings\n\n\n");
+    
+    ////////////////////////////////////////////////////////////////
+    //    Char Functions
+    
+    char ForwardArray[] = "Hello, Sailor";
+    char BackwardArray[] = "roliaS ,olleH";
+    TestClean(CharArraysEqual(ForwardArray, 13, ForwardArray, 13), "String Equality");
+    TestClean(!CharArraysEqual(ForwardArray, 13, BackwardArray, 13), "String Equality");
+    
+    ReverseCharArray(ForwardArray, 13);
+    TestClean(CharArraysEqual(ForwardArray, 13, BackwardArray, 13), "Reversing Char Array");
+    
+    char UIntString[] = "1234";
+    u32 UIntValue = 1234;
+    u32 ParsedUInt = ParseUnsignedInt(UIntString, 4);
+    TestClean((ParsedUInt == UIntValue), "String To U32");
+    char StringifiedUInt[4] = {};
+    UIntToString(UIntValue, StringifiedUInt, 4);
+    TestClean(CharArraysEqual(UIntString, 4, StringifiedUInt, 4), "U32 To String");
+    
+    char IntString[] = "-1234";
+    s32 IntValue = -1234;
+    s32 ParsedInt = ParseSignedInt(IntString, 5);
+    TestClean((ParsedInt == IntValue), "String To S32");
+    char StringifiedInt[5] = {};
+    IntToString(IntValue, StringifiedInt, 5);
+    TestClean(CharArraysEqual(IntString, 5, StringifiedInt, 5), "S32 to String");
+    
+    char FloatString[] = "-1234.125";
+    float FloatValue = -1234.125f;
+    float ParsedFloat = ParseFloat(FloatString, 8);
+    TestClean((ParsedFloat == FloatValue), "String To Float");
+    char StringifiedFloat[10] = {};
+    FloatToString(FloatValue, StringifiedFloat, 10, 3);
+    TestClean(CharArraysEqual(FloatString, 8, StringifiedFloat, 8), "Float To String");
+    
+    ////////////////////////////////////////////////////////////////
+    //
+    
+    StringArena.SlotSize = 256;
+    StringArena.SlotCount = 32;
+    StringArena.Memory = Allocate(StringArena.SlotSize * StringArena.SlotCount);
+    slot_header* PrevSlotHeader = 0;
+    for (int i = StringArena.SlotCount - 1; i >= 0; i--)
+    {
+        u8* SlotBase = StringArena.Memory + (i * StringArena.SlotSize);
+        slot_header* SlotHeader = (slot_header*)SlotBase;
+        SlotHeader->Size = StringArena.SlotSize;
+        SlotHeader->Next = PrevSlotHeader;
+        
+        // TEST(peter): Should be true always, except on the first iteration, when there is no next slot
+        bool Contiguity = SlotsAreContiguous(SlotHeader, PrevSlotHeader);
+        TestClean((Contiguity || SlotHeader->Next == 0), "Contiguous Arenas");
+        
+        PrevSlotHeader = SlotHeader;
+    }
+    StringArena.FreeList = PrevSlotHeader;
+    
+    // TEST(peter): Count Should equal StringArena.SlotCount
+    s32 ContiguousSlotsCountBefore = CountContiguousSlots(StringArena.FreeList).Count;
+    TestClean((ContiguousSlotsCountBefore == StringArena.SlotCount), "Contiguous Arenas");
+    
+    // TEST(peter): Should be false
+    bool Contiguity = SlotsAreContiguous(StringArena.FreeList, StringArena.FreeList->Next->Next);
+    Contiguity = SlotsAreContiguous(StringArena.FreeList->Next->Next, StringArena.FreeList);
+    TestClean(!Contiguity, "Non Contiguous Arenas");
+    
+    s32 Slots = CalculateSlotCountFromSize(10, 256);
+    TestClean(Slots == 1, "Slot Sizing");
+    Slots = CalculateSlotCountFromSize(256, 256);
+    TestClean(Slots == 1, "Slot Sizing");
+    Slots = CalculateSlotCountFromSize(345, 256);
+    TestClean(Slots == 2, "Slot Sizing");
+    Slots = CalculateSlotCountFromSize(1024, 256);
+    TestClean(Slots == 4, "Slot Sizing");
+    
+    slot_header* HeaderTen = GetSlotAtOffset(StringArena.FreeList, 10);
+    slot_header* HeaderThree = GetSlotAtOffset(StringArena.FreeList, 3);
+    slot_header* HeaderFive = GetSlotAtOffset(StringArena.FreeList, 5);
+    
+    string StringA = AllocStringFromStringArena(10, &StringArena);
+    string StringB = AllocStringFromStringArena(345, &StringArena);
+    
+#if 0
+    // TEST(peter): Should TestClean
+    u8* RandomMemory = (u8*)malloc(256);
+    string RandomMemString = {};
+    RandomMemString.Data = (char*)RandomMemory;
+    RandomMemString.Max = 256;
+    FreeToStringArena(&RandomMemString, &StringArena); 
+#endif
+    FreeToStringArena(&StringA, &StringArena);
+    FreeToStringArena(&StringB, &StringArena);
+    // TEST(peter): After freeing both allocations, ContiguousSlotCountBefore and ContiguousSlotCountAfter should be equal
+    s32 ContiguousSlotCountAfter = CountContiguousSlots(StringArena.FreeList).Count;
+    TestClean(ContiguousSlotCountAfter == ContiguousSlotsCountBefore, "Add and REmove Slots from Arena");
+    
+    // TEST(peter): Set up a free list where the first element is too small, so it has to traverse to find an appropriately
+    // sized block
+    // The slots will look list [256][used][256][256][256] etc..
+    StringA = AllocStringFromStringArena(256, &StringArena);
+    StringB = AllocStringFromStringArena(256, &StringArena);
+    FreeToStringArena(&StringA, &StringArena);
+    u32 Contiguous = CountContiguousSlots(StringArena.FreeList).Count; // Should = 1;
+    string StringC = AllocStringFromStringArena(512, &StringArena);
+    slot_header* HeaderC = (slot_header*)(StringC.Data);
+    
+    string ReallocTestString = AllocStringFromStringArena(256, &StringArena);
+    DEBUGPrintChars(&ReallocTestString, 24);
+    ReallocFromStringArena(&ReallocTestString, 512, &StringArena);
+    
+    
+    string TestString = AllocStringFromStringArena(10, &StringArena);
+    DEBUGPrintChars(&TestString, TestString.Max);
+    ReallocFromStringArena(&TestString, 20, &StringArena);
+    DEBUGPrintChars(&TestString, TestString.Max);
+    ReallocFromStringArena(&TestString, 10, &StringArena);
+    FreeToStringArena(&TestString, &StringArena);
+    
+    string EqualityStringA = AllocStringFromStringArena(345, &StringArena);
+    string EqualityStringB = AllocStringFromStringArena(415, &StringArena);
+    // Equality should succeed despite length differences
+    string EqualityStringC = AllocStringFromStringArena(256, &StringArena); 
+    string EqualityStringD = AllocStringFromStringArena(256, &StringArena); // Equality should fail
+    string EqualityStringEmpty = {};
+    
+    DEBUGPrintChars(&EqualityStringA, 24);
+    DEBUGPrintChars(&EqualityStringB, 24);
+    DEBUGPrintChars(&EqualityStringC, 24);
+    DEBUGPrintChars(&EqualityStringD, 12);
+    
+    bool ABEquality = StringsEqual(EqualityStringA, EqualityStringB); // Should Succeed
+    bool ACEquality = StringsEqual(EqualityStringA, EqualityStringC); // Should Succeed
+    bool ADEquality = StringsEqual(EqualityStringA, EqualityStringD); // Should Fail
+    bool AEEquality = StringsEqual(EqualityStringA, EqualityStringEmpty); // Should Fail
+    
+    TestClean(ABEquality, "String Equality");
+    TestClean(ACEquality, "String Equality");
+    TestClean(!ADEquality, "String Equality");
+    TestClean(!AEEquality, "String Equality");
+    
+    string CatStringA = AllocStringFromStringArena(256, &StringArena);
+    SetStringToCharArray(&CatStringA, "Hello ");
+    string CatStringB = AllocStringFromStringArena(512, &StringArena);
+    SetStringToCharArray(&CatStringB, "Sailor!");
+    string CatStringResult = AllocStringFromStringArena(512, &StringArena);
+    SetStringToCharArray(&CatStringResult, "Hello Sailor!");
+    ConcatString(&CatStringA, CatStringB);
+    TestClean(StringsEqual(CatStringA, CatStringResult), "Cat Strings");
+    
+    s32 FirstSpaceIndex = FindFirstChar(CatStringA, ' ');
+    TestClean(FirstSpaceIndex == 5, "First Index");
+    
+    SetStringToChar(&CatStringB, 'B', 5);
+    TestClean(StringEqualsCharArray(CatStringB, "BBBBB"), "SetStringToChar");
+    
+    
+    DebugPrint("Results: Passed %d / %d\n\n\n", SuccessCount, TestCount);
+}
+#endif // DEBUG
