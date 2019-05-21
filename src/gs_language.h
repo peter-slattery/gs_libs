@@ -119,6 +119,13 @@ GSZeroMemory (u8* Memory, s32 Size)
     for (int i = 0; i < Size; i++) { Memory[i] = 0; }
 }
 
+#define GSCopyMemory(from, to, size) GSCopyMemory_((u8*)from, (u8*)to, size)
+static void
+GSCopyMemory_ (u8* From, u8* To, s32 Size)
+{
+    for (int i = 0; i < Size; i++) { To[i] = From[i]; }
+}
+
 #define GSMinDef(type) static type GSMin(type A, type B) { return (A < B ? A : B); }
 GSMinDef(s8)
 GSMinDef(s16)

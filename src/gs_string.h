@@ -66,14 +66,21 @@ static bool     IsNumeric (char C);
 static bool     ToUpper (char C);
 static bool     ToLower (char C);
 static bool     IsAlphaNumeric (char C);
-static u32 CharToUInt (char C);
+static u32      CharToUInt (char C);
+static s32      CharArrayLength (char* CharArray);
 static bool     CharArraysEqual (char* A, s32 ALength, char* B, s32 BLength);
 static void     ReverseCharArray (char* Array, s32 Length);
+#define         FirstIndexOfChar(array, find) GetIndexOf(array, 0, find)
+static s32      IndexOfChar (char* Array, s32 Start, char Find);
+#define         FastLastIndexOfChar(array, len, find) FastReverseIndexOfChar(array, len, 0, find)
+static s32      FastReverseIndexOfChar (char* Array, s32 Length, s32 OffsetFromEnd, char Find);
+#define         LastIndexOfChar(array, find) ReverseIndexOfChar(array, 0, find)
+static s32      ReverseIndexOfChar (char* Array, s32 OffsetFromEnd, char Find);
 
 // String
 static bool    StringsEqual (string A, string B);
 static bool    StringEqualsCharArray (string String, char* CharArray);
-static s32 FindFirstChar (string String, char C);
+static s32     FindFirstChar (string String, char C);
 static void    SetStringToChar (string* Dest, char C, s32 Count);
 static void    SetStringToCharArray (string* Dest, char* Source);
 static void    ConcatString (string* Dest, string Source);
@@ -85,13 +92,13 @@ static void    RemoveCharAt (string* String, s32 Index);
 static string  Substring (string* String, s32 Start, s32 End);
 
 // Parsing
-static u32 ParseUnsignedInt (char* String, s32 Length);
-static s32  UIntToString (u32 Int, char* String, s32 Length);
-static s32  ParseSignedInt (char* String, s32 Length);
-static s32  IntToString (s32 Int, char* String, s32 Length);
-static s32  IntToString (s32 Int, char* String, s32 Length, s32 Offset);
-static float    ParseFloat (char* String, s32 Length);
-static s32  FloatToString(float Float, char *String, s32 Length, s32 AfterPoint);
+static u32   ParseUnsignedInt (char* String, s32 Length);
+static s32   UIntToString (u32 Int, char* String, s32 Length);
+static s32   ParseSignedInt (char* String, s32 Length);
+static s32   IntToString (s32 Int, char* String, s32 Length);
+static s32   IntToString (s32 Int, char* String, s32 Length, s32 Offset);
+static float ParseFloat (char* String, s32 Length);
+static s32   FloatToString(float Float, char *String, s32 Length, s32 AfterPoint);
 
 
 ////////////////////////////////////////////////////////////////
@@ -225,6 +232,17 @@ CharArrayLength (char* Array)
     return Result;
 }
 
+static s32      
+NullTerminatedCharArrayLength (char* CharArray)
+{
+    char* Iter = CharArray;
+    while (*Iter)
+    {
+        *Iter++;
+    }
+    return (Iter - CharArray);
+}
+
 static bool
 CharArraysEqual (char* A, s32 ALength, char* B, s32 BLength)
 {
@@ -258,6 +276,56 @@ ReverseCharArray (char* Array, s32 Length)
         *ForwardIter++ = B;
         *BackwardIter-- = F;
     }
+}
+
+static s32 
+IndexOfChar (char* Array, s32 After, char Find)
+{
+    s32 Result = -1;
+    
+    s32 Counter = After;
+    char* Iter = Array + After;
+    while (*Iter)
+    {
+        if (*Iter == Find)
+        {
+            Result = Counter;
+            break;
+        }
+        Counter++;
+        *Iter++;
+    }
+    
+    return Result;
+}
+
+static s32
+FastReverseIndexOfChar (char* Array, s32 Length, s32 OffsetFromEnd, char Find)
+{
+    s32 Result = -1;
+    
+    s32 Counter = Length - OffsetFromEnd;
+    char* Iter = Array + Length - OffsetFromEnd;
+    for (int i = 0; i < (Length - OffsetFromEnd); i++)
+    {
+        if (*Iter == Find)
+        {
+            Result = Counter;
+            break;
+        }
+        
+        *Iter--;
+        Counter--;
+    }
+    
+    return Result;
+}
+
+static s32
+ReverseIndexOfChar (char* Array, s32 OffsetFromEnd, char Find)
+{
+    s32 StringLength = NullTerminatedCharArrayLength(Array);
+    return FastReverseIndexOfChar(Array, StringLength, OffsetFromEnd, Find);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -853,6 +921,13 @@ TestStrings()
     TestClean(CharArraysEqual(ForwardArray, 13, ForwardArray, 13), "String Equality");
     TestClean(!CharArraysEqual(ForwardArray, 13, BackwardArray, 13), "String Equality");
     
+    TestClean(IndexOfChar(ForwardArray, 0, ',') == 5, "Index Of Char");
+    TestClean(IndexOfChar(ForwardArray, 5, 'l') == 10, "Index of Char (skipping first 5)");
+    TestClean(FastReverseIndexOfChar(ForwardArray, 13, 0, 'o') == 11, "Fast Reverse Index Of Char");
+    TestClean(ReverseIndexOfChar(ForwardArray, 0, 'o') == 11, "Reverse Index of Char");
+    TestClean(ReverseIndexOfChar(ForwardArray, 3, 'o') == 4, "Reverse Index of Char (skipping last 3)");
+    TestClean(LastIndexOfChar(ForwardArray, 'o') == 11, "Last Index of Char");
+    
     ReverseCharArray(ForwardArray, 13);
     TestClean(CharArraysEqual(ForwardArray, 13, BackwardArray, 13), "Reversing Char Array");
     
@@ -879,6 +954,7 @@ TestStrings()
     char StringifiedFloat[10] = {};
     FloatToString(FloatValue, StringifiedFloat, 10, 3);
     TestClean(CharArraysEqual(FloatString, 8, StringifiedFloat, 8), "Float To String");
+    
     
     ////////////////////////////////////////////////////////////////
     //
