@@ -4,7 +4,7 @@
 
 struct string
 {
-    char* Data;
+    char* Memory;
     s32 Length;
     s32 Max;
 };
@@ -55,7 +55,7 @@ static void   InitializeString (string* String, char* Data, s32 DataSize);
 static string InitializeString (char* Data, s32 DataSize);
 static void   ClearString (string* String);
 
-// Char/Char Array
+// Character Values
 static bool     IsSlash (char C);
 static bool     IsNewline (char C);
 static bool     IsWhitespace (char C);
@@ -66,30 +66,54 @@ static bool     IsNumeric (char C);
 static bool     ToUpper (char C);
 static bool     ToLower (char C);
 static bool     IsAlphaNumeric (char C);
+
+// Tokenizing
+static char*    EatToNewLine(char* C);
+static char*    EatWhitespace(char* C);
+
+// Char/Char Array
 static u32      CharToUInt (char C);
 static s32      CharArrayLength (char* CharArray);
 static bool     CharArraysEqual (char* A, s32 ALength, char* B, s32 BLength);
+static bool     CharArraysEqualUnsafe (char* A, char* B);
 static void     ReverseCharArray (char* Array, s32 Length);
-#define         FirstIndexOfChar(array, find) GetIndexOf(array, 0, find)
+#define         FirstIndexOfChar(array, find) IndexOfChar(array, 0, find)
 static s32      IndexOfChar (char* Array, s32 Start, char Find);
 #define         FastLastIndexOfChar(array, len, find) FastReverseIndexOfChar(array, len, 0, find)
 static s32      FastReverseIndexOfChar (char* Array, s32 Length, s32 OffsetFromEnd, char Find);
 #define         LastIndexOfChar(array, find) ReverseIndexOfChar(array, 0, find)
 static s32      ReverseIndexOfChar (char* Array, s32 OffsetFromEnd, char Find);
+static b32      CharArrayContains(char* Array, char* CheckFor);
 
 // String
 static bool    StringsEqual (string A, string B);
 static bool    StringEqualsCharArray (string String, char* CharArray);
 static s32     FindFirstChar (string String, char C);
+
 static void    SetStringToChar (string* Dest, char C, s32 Count);
 static void    SetStringToCharArray (string* Dest, char* Source);
+
 static void    ConcatString (string* Dest, string Source);
 static void    ConcatString (string* Dest, string Source, s32 Length);
+static void    ConcatCharArrayToString (string* Dest, char* Source);
+static void    ConcatCharArrayToString (string* Dest, char* Source, s32 SourceLength);
+
 static void    CopyStringTo (string Source, string* Dest);
-static void    CopyCharArray (char* Source, char* Dest, s32 DestLength);
+static s32     CopyStringToCharArray (string Source, char* Dest, s32 DestLength);
+static void    CopyCharArrayToString (char* Src, string* Dest);
+static void    CopyCharArrayToString (char* Src, s32 SrcLength, string* Dest);
+static s32     CopyCharArray (char* Source, char* Dest, s32 DestLength);
+static s32     CopyCharArrayAt (char* Source, char* Dest, s32 DestLength, s32 Offset);
+
 static void    InsertChar (string* String, char Char, s32 Index);
+static void    InsertStringAt (string* Dest, string Source, s32 At);
 static void    RemoveCharAt (string* String, s32 Index);
+
 static string  Substring (string* String, s32 Start, s32 End);
+static string  Substring (string* String, s32 Start);
+
+static void    NullTerminate (string* String);
+
 
 // Parsing
 static u32   ParseUnsignedInt (char* String, s32 Length);
@@ -162,7 +186,7 @@ GSPow (float N, s32 Power)
 static void
 InitializeString (string* String, char* Data, s32 DataSize)
 {
-    String->Data = Data;
+    String->Memory = Data;
     String->Max = DataSize;
     String->Length = 0;
 }
@@ -171,7 +195,7 @@ static string
 InitializeString (char* Data, s32 DataSize)
 {
     string Result = {};
-    Result.Data = Data;
+    Result.Memory = Data;
     Result.Max = DataSize;
     Result.Length = 0;
     return Result;
@@ -180,13 +204,13 @@ InitializeString (char* Data, s32 DataSize)
 static void
 ClearString (string* String)
 {
-    String->Data = 0;
+    String->Memory = 0;
     String->Max = 0;
     String->Length = 0;
 }
 
 ////////////////////////////////////////////////////////////////
-//        Basic Char Operations
+//        Char Value Types
 ////////////////////////////////////////////////////////////////
 
 static bool IsSlash (char C) { return ((C == '\\') || (C == '/')); }
@@ -213,6 +237,31 @@ static bool IsAlphaNumeric (char C)
 {
     return IsAlpha(C) || IsNumeric(C);
 }
+
+////////////////////////////////////////////////////////////////
+//        Tokenizing
+////////////////////////////////////////////////////////////////
+
+static char*    
+EatToNewLine(char* C)
+{
+    char* Result = C;
+    while (*Result && !IsNewline(*Result)) { Result++; }
+    if (*Result) { Result++; } // NOTE(Peter): eat past the newline character
+    return Result;
+}
+
+static char*    
+EatWhitespace(char* C)
+{
+    char* Result = C;
+    while (*Result && IsWhitespace(*Result)) { Result++; }
+    return Result;
+}
+
+////////////////////////////////////////////////////////////////
+//        Basic Char Operations
+////////////////////////////////////////////////////////////////
 
 static u32 CharToUInt (char C) { 
     u32 Result = (C - '0');
@@ -261,6 +310,30 @@ CharArraysEqual (char* A, s32 ALength, char* B, s32 BLength)
             }
         }
     }
+    return Result;
+}
+
+static bool
+CharArraysEqualUnsafe (char* A, char* B)
+{
+    bool Result = true;
+    
+    char* AIter = A;
+    char* BIter = B;
+    while(*AIter && *BIter)
+    {
+        if(*AIter++ != *BIter++)
+        {
+            Result = false;
+            break;
+        }
+    }
+    
+    if((*AIter && !*BIter) || (!*AIter && *BIter))
+    {
+        Result = false;
+    }
+    
     return Result;
 }
 
@@ -328,6 +401,36 @@ ReverseIndexOfChar (char* Array, s32 OffsetFromEnd, char Find)
     return FastReverseIndexOfChar(Array, StringLength, OffsetFromEnd, Find);
 }
 
+static b32      
+CharArrayContains(char* Array, char* CheckFor)
+{
+    b32 Result = false;
+    
+    char* Src = Array;
+    while (*Src)
+    {
+        if (*Src == *CheckFor)
+        {
+            char* A = CheckFor;
+            char* B = Src;
+            while (*B && *A && *A == *B)
+            {
+                *B++; *A++;
+            }
+            
+            if (*A == 0)
+            {
+                Result = true;
+                break;
+            }
+        }
+        
+        Src++;
+    }
+    
+    return Result;
+}
+
 ////////////////////////////////////////////////////////////////
 //        Basic String Operations
 ////////////////////////////////////////////////////////////////
@@ -340,8 +443,8 @@ StringsEqual (string A, string B)
     if (A.Length == B.Length)
     {
         Result = true;
-        char* AIter = A.Data;
-        char* BIter = B.Data;
+        char* AIter = A.Memory;
+        char* BIter = B.Memory;
         for (s32 i = 0; i < A.Length; i++)
         {
             if (*AIter++ != *BIter++)
@@ -355,12 +458,22 @@ StringsEqual (string A, string B)
     return Result;
 }
 
-#define MakeStringLiteral(array) MakeString((array), sizeof(array))
+#define MakeStringLiteral(array) MakeString((array), sizeof(array) - 1)
+static string
+MakeString (char* Array, s32 Length, s32 Max)
+{
+    string Result = {};
+    Result.Memory = Array;
+    Result.Length = Length;
+    Result.Max = Max;
+    return Result;
+}
+
 static string
 MakeString (char* Array, s32 Length)
 {
     string Result = {};
-    Result.Data = Array;
+    Result.Memory = Array;
     Result.Length = Length;
     Result.Max = Length;
     return Result;
@@ -378,7 +491,7 @@ StringEqualsCharArray (string String, char* CharArray)
 {
     bool Result = true;
     
-    char* S = String.Data;
+    char* S = String.Memory;
     char* C = CharArray;
     
     s32 Count = 0;
@@ -400,7 +513,7 @@ FindFirstChar (string String, char C)
 {
     s32 Result = -1;
     
-    char* Iter = String.Data;
+    char* Iter = String.Memory;
     for (int i = 0; i < String.Length; i++)
     {
         if (*Iter++ == C)
@@ -418,7 +531,7 @@ SetStringToChar (string* Dest, char C, s32 Count)
 {
     Assert(Count <= Dest->Max);
     
-    char* Iter = Dest->Data;
+    char* Iter = Dest->Memory;
     for (int i = 0; i < Count; i++)
     {
         *Iter++ = C;
@@ -432,7 +545,7 @@ SetStringToCharArray (string* Dest, char* Source)
     Dest->Length = 0;
     
     char* Src = Source;
-    char* Dst = Dest->Data;
+    char* Dst = Dest->Memory;
     while (*Src && Dest->Length < Dest->Max)
     {
         *Dst++ = *Src++;
@@ -445,8 +558,8 @@ ConcatString (string* Dest, string Source)
 {
     Assert((Dest->Length + Source.Length) <= Dest->Max);
     
-    char* Dst = Dest->Data + Dest->Length;
-    char* Src = Source.Data;
+    char* Dst = Dest->Memory + Dest->Length;
+    char* Src = Source.Memory;
     for (s32 i = 0; i < Source.Length; i++)
     {
         *Dst++ = *Src++;
@@ -460,9 +573,38 @@ ConcatString (string* Dest, string Source, s32 Length)
     Assert(Length < Source.Length);
     Assert((Dest->Length + Length) <= Dest->Max);
     
-    char* Dst = Dest->Data + Dest->Length;
-    char* Src = Source.Data;
+    char* Dst = Dest->Memory + Dest->Length;
+    char* Src = Source.Memory;
     for (s32 i = 0; i < Length; i++)
+    {
+        *Dst++ = *Src++;
+        Dest->Length++;
+    }
+}
+
+static void    
+ConcatCharArrayToString (string* Dest, char* Source)
+{
+    Assert(CharArrayLength(Source) + Dest->Length <= Dest->Max);
+    
+    char* Dst = Dest->Memory + Dest->Length;
+    char* Src = Source;
+    while (Dest->Length < Dest->Max &&
+           *Src)
+    {
+        *Dst++ = *Src++;
+        Dest->Length++;
+    }
+}
+
+static void    
+ConcatCharArrayToString (string* Dest, char* Source, s32 SourceLength)
+{
+    Assert(SourceLength + Dest->Length <= Dest->Max);
+    
+    char* Dst = Dest->Memory + Dest->Length;
+    char* Src = Source;
+    for (int i = 0; i < SourceLength && Dest->Length < Dest->Max; i++)
     {
         *Dst++ = *Src++;
         Dest->Length++;
@@ -472,8 +614,8 @@ ConcatString (string* Dest, string Source, s32 Length)
 static void
 CopyStringTo (string Source, string* Dest)
 {
-    char* Src = Source.Data;
-    char* Dst = Dest->Data;
+    char* Src = Source.Memory;
+    char* Dst = Dest->Memory;
     s32 CopyLength = GSMin(Source.Length, Dest->Max);
     for (int i = 0; i < CopyLength; i++)
     {
@@ -482,7 +624,48 @@ CopyStringTo (string Source, string* Dest)
     Dest->Length = Source.Length;
 }
 
-static void
+static s32    
+CopyStringToCharArray (string Source, char* Dest, s32 DestLength)
+{
+    char* Src = Source.Memory;
+    char* Dst = Dest;
+    s32 CopyLength = GSMin(Source.Length, DestLength);
+    for (int i = 0; i < CopyLength; i++)
+    {
+        *Dst++ = *Src++;
+    }
+    return CopyLength;
+}
+
+static void    
+CopyCharArrayToString (char* Source, string* Dest)
+{
+    char* Src = Source;
+    char* Dst = Dest->Memory;
+    s32 Copied = 0;
+    while (*Src && Copied < Dest->Max)
+    {
+        *Dst++ = *Src++;
+        Copied++;
+    }
+    Dest->Length = Copied;
+}
+
+static void    
+CopyCharArrayToString (char* Source, s32 SourceLength, string* Dest)
+{
+    Assert(SourceLength <= Dest->Max);
+    
+    char* Src = Source;
+    char* Dst = Dest->Memory;
+    for (s32 i = 0; i < SourceLength; i++)
+    {
+        *Dst++ = *Src++;
+    }
+    Dest->Length = SourceLength;
+}
+
+static s32
 CopyCharArray (char* Source, char* Dest, s32 DestLength)
 {
     char* Src = Source;
@@ -490,9 +673,26 @@ CopyCharArray (char* Source, char* Dest, s32 DestLength)
     s32 i = 0; 
     while (*Src && i < DestLength)
     {
-        *Src++ = *Dst++;
+        *Dst++ = *Src++;
         i++;
     }
+    return i;
+}
+
+static s32    
+CopyCharArrayAt (char* Source, char* Dest, s32 DestLength, s32 Offset)
+{
+    Assert(Offset < DestLength);
+    
+    char* Src = Source;
+    char* Dst = Dest + Offset;
+    s32 i = Offset;
+    while (*Src && i < DestLength)
+    {
+        *Dst++ = *Src++;
+        i++;
+    }
+    return i - Offset;
 }
 
 static void
@@ -501,14 +701,14 @@ InsertChar (string* String, char Char, s32 Index)
     Assert(Index >= 0 && Index < String->Max);
     Assert(String->Length < String->Max);
     
-    char* Src = String->Data + String->Length;
+    char* Src = String->Memory + String->Length;
     char* Dst = Src + 1;
     for (int i = String->Length - 1; i >= Index; i--)
     {
         *Dst-- = *Src--;
     }
     
-    *(String->Data + Index) = Char;
+    *(String->Memory + Index) = Char;
     String->Length++;
 }
 
@@ -517,7 +717,7 @@ RemoveCharAt (string* String, s32 Index)
 {
     Assert(Index >= 0 && Index < String->Max);
     
-    char* Dst = String->Data + Index;
+    char* Dst = String->Memory + Index;
     char* Src = Dst + 1;
     for (int i = Index; i < String->Length; i++)
     {
@@ -530,12 +730,54 @@ RemoveCharAt (string* String, s32 Index)
 static string
 Substring (string* String, s32 Start, s32 End)
 {
-    Assert(Start >= 0 && End > Start && End < String->Length);
+    Assert(Start >= 0 && End > Start && End <= String->Length);
     
     string Result = {};
-    Result.Data = String->Data + Start;
+    Result.Memory = String->Memory + Start;
     Result.Length = End - Start;
     return Result;
+}
+
+static string
+Substring (string* String, s32 Start)
+{
+    Assert(Start >= 0 && Start < String->Length);
+    
+    string Result = {};
+    Result.Memory = String->Memory + Start;
+    Result.Length = String->Length - Start;
+    return Result;
+}
+
+static void
+NullTerminate (string* String)
+{
+    Assert(String->Length + 1 <= String->Max);
+    *(String->Memory + String->Length) = 0;
+    String->Length++;
+}
+
+static void    
+InsertStringAt (string* Dest, string Source, s32 At)
+{
+    Assert(At + Source.Length < Dest->Max);
+    Assert(At < Dest->Length);
+    
+    char* Src = Dest->Memory + Dest->Length;
+    char* Dst = Dest->Memory + Source.Length + Dest->Length;
+    for (s32 i = Dest->Length - 1; i >= At; i--)
+    {
+        *--Dst = *--Src;
+    }
+    
+    Src = Source.Memory;
+    Dst = Dest->Memory + At;
+    for (s32 j = 0; j < Source.Length; j++)
+    {
+        *Dst++ = *Src++;
+    }
+    
+    Dest->Length += Source.Length;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -712,10 +954,66 @@ FloatToString(float Float, char *String, s32 Length, s32 AfterPoint)
 ////////////////////////////////////////////////////////////////
 
 
-static void
-PrintF (string* Dest, char* Format, s32 FormatLength,  ...)
+internal s32
+PrintStringF(char* Format, char* Destination, s32 DestLength, ...)
 {
+    va_list Args;
+    va_start(Args, DestLength);
     
+    s32 LengthPrinted = 0;
+    char* DestChar = Destination;
+    
+    char* C = Format;
+    while(*C)
+    {
+        if (*C == '%')
+        {
+            C++;
+            if (*C == 's') // string
+            {
+                C++;
+                char* InsertString = va_arg(Args, char*);
+                s32 LengthCopied = CopyCharArray(InsertString, DestChar, DestLength - LengthPrinted);
+                DestChar += LengthCopied;
+                LengthPrinted += LengthCopied;
+            }
+            else if(*C == 'd') // integer
+            {
+                C++;
+                s32 Integer = va_arg(Args, s32);
+                
+                s32 IntLength = IntToString(Integer, DestChar, DestLength - LengthPrinted);
+                DestChar += IntLength;
+                LengthPrinted += IntLength;
+            }
+            else if (*C == 'f')
+            {
+                C++;
+                r32 Float = va_arg(Args, r32);
+                s32 FloatLength = FloatToString(Float, DestChar, DestLength - LengthPrinted, 5);
+                DestChar += FloatLength;
+                LengthPrinted += FloatLength;
+            }
+            else
+            {
+                *DestChar++ = *C++;
+            }
+        }
+        else
+        {
+            *DestChar++ = *C++;
+        }
+    }
+    
+    if (LengthPrinted >= DestLength)
+    {
+        LengthPrinted = DestLength - 1;
+    }
+    *(Destination + LengthPrinted) = 0;
+    
+    va_end(Args);
+    
+    return LengthPrinted;
 }
 
 
@@ -842,8 +1140,8 @@ AllocStringFromStringArena (string* String, s32 Size, slot_arena* Storage)
     
     if (Slot)
     {
-        String->Data = (char*)Slot;
-        GSZeroMemory((u8*)String->Data, SlotCount * Storage->SlotSize);
+        String->Memory = (char*)Slot;
+        GSZeroMemory((u8*)String->Memory, SlotCount * Storage->SlotSize);
         String->Max = SlotCount * Storage->SlotSize;
         String->Length = 0;
     }
@@ -860,7 +1158,7 @@ AllocStringFromStringArena (s32 Size, slot_arena* Storage)
 static void
 FreeToStringArena (string* String, slot_arena* Storage)
 {
-    u8* Base = (u8*)(String->Data);
+    u8* Base = (u8*)(String->Memory);
     u8* End = Base + String->Max - 1;
     u8* MemoryEnd = Storage->Memory + (Storage->SlotSize * Storage->SlotCount);
     Assert((Base >= Storage->Memory) && (End < MemoryEnd));
@@ -876,7 +1174,7 @@ FreeToStringArena (string* String, slot_arena* Storage)
         Slot = (slot_header*)(Base + SizeReclaimed);
     }
     
-    String->Data = 0;
+    String->Memory = 0;
     String->Length = 0;
     String->Max = 0;
 }
@@ -894,7 +1192,7 @@ ReallocFromStringArena (string* String, s32 NewSize, slot_arena* Storage)
 
 void DEBUGPrintChars (string* String, s32 Count)
 {
-    char* Iter = String->Data;
+    char* Iter = String->Memory;
     for (int i = 0; i < Count; i++)
     {
         *Iter++ = (char)('A' + i);
@@ -1007,7 +1305,7 @@ TestStrings()
     // TEST(peter): Should TestClean
     u8* RandomMemory = (u8*)malloc(256);
     string RandomMemString = {};
-    RandomMemString.Data = (char*)RandomMemory;
+    RandomMemString.Memory = (char*)RandomMemory;
     RandomMemString.Max = 256;
     FreeToStringArena(&RandomMemString, &StringArena); 
 #endif
@@ -1025,7 +1323,7 @@ TestStrings()
     FreeToStringArena(&StringA, &StringArena);
     u32 Contiguous = CountContiguousSlots(StringArena.FreeList).Count; // Should = 1;
     string StringC = AllocStringFromStringArena(512, &StringArena);
-    slot_header* HeaderC = (slot_header*)(StringC.Data);
+    slot_header* HeaderC = (slot_header*)(StringC.Memory);
     
     string ReallocTestString = AllocStringFromStringArena(256, &StringArena);
     DEBUGPrintChars(&ReallocTestString, 24);
