@@ -2,10 +2,6 @@
 gs_radix_sort.h - An implementation of radix sort for fixed size unsigned 32bit integer buffers
 
 TODO
- x remove ALL dependencies - currently rely on stdlib.h
- x support sorting in bases other than 10
- x in place, binary, Most significant digit sort
-
 */
 
 #ifndef GS_RADIX_SORT_H
@@ -26,28 +22,6 @@ struct gs_radix_entry
 {
     gs_rad_u32 Radix;
     gs_rad_u32 ID;
-};
-
-#define RADIX_SORT_BUCKET_DEPTH 32
-struct radix_sort_bucket_buffer
-{
-    gs_radix_entry Contents[RADIX_SORT_BUCKET_DEPTH];
-};
-
-struct radix_sort_bucket
-{
-    radix_sort_bucket_buffer** Buffers;
-    gs_rad_u32 BuffersCount;
-    gs_rad_u32 EntriesUsed;
-};
-
-struct radix_sort
-{
-    gs_radix_entry* Data;
-    gs_rad_u32 Length;
-    gs_rad_u32 Highest;
-    gs_rad_u32 TotalIterations;
-    gs_rad_u32 CurrentIteration;
 };
 
 static void

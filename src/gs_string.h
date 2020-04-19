@@ -1,5 +1,13 @@
+// TODO
+/*
+- InsertCharArrayIntoStringAt
+- AppendChar
+*/
+#ifndef GS_STRING_H
+#include <stdarg.h>
+
 ////////////////////////////////////////////////////////////////
-//        String 
+//        String
 ////////////////////////////////////////////////////////////////
 
 struct string
@@ -9,6 +17,106 @@ struct string
     s32 Max;
 };
 
+////////////////////////////////////////////////////////////////
+//        String Tokenizing
+////////////////////////////////////////////////////////////////
+
+struct tokenizer
+{
+    char* At;
+    char* LineStart;
+    
+    char* Memory;
+    s32 MemoryLength;
+    u32 LineNumber;
+};
+
+enum token_type
+{
+    Token_Error,
+    
+    Token_LeftParen,
+    Token_RightParen,
+    Token_LeftSquareBracket,
+    Token_RightSquareBracket,
+    Token_LeftCurlyBracket,
+    Token_RightCurlyBracket,
+    Token_Semicolon,
+    Token_Operator,
+    Token_Comma,
+    Token_Period,
+    Token_PointerReference,
+    
+    Token_PoundDefine, // Must stay first preproc token type
+    Token_PoundUndef,
+    Token_PoundInclude,
+    Token_PoundIfDef,
+    Token_PoundIfNDef,
+    Token_PoundIf,
+    Token_PoundElif,
+    Token_PoundElse,
+    Token_PoundEndif,
+    Token_PoundError,
+    Token_PoundPragma,
+    Token_PoundLine,  // Must stay Last Preproc Token Type
+    
+    Token_Number,
+    Token_Char,
+    Token_String,
+    Token_Identifier,
+    
+    Token_Comment,
+    Token_MultilineComment,
+    
+    Token_EndOfLine,
+    
+    Token_Unknown,
+    Token_EndOfStream,
+};
+
+char* TokenNames[] = {
+    "Token_Error",
+    "Token_LeftParen",
+    "Token_RightParen",
+    "Token_LeftSquareBracket",
+    "Token_RightSquareBracket",
+    "Token_LeftCurlyBracket",
+    "Token_RightCurlyBracket",
+    "Token_Semicolon",
+    "Token_Operator",
+    "Token_Comma",
+    "Token_Period",
+    "Token_PointerReference",
+    "Token_PoundDefine",
+    "Token_PoundUndef",
+    "Token_PoundInclude",
+    "Token_PoundIfDef",
+    "Token_PoundIfNDef",
+    "Token_PoundIf",
+    "Token_PoundElif",
+    "Token_PoundElse",
+    "Token_PoundEndif",
+    "Token_PoundError",
+    "Token_PoundPragma",
+    "Token_PoundLine",
+    "Token_Number",
+    "Token_Char",
+    "Token_String",
+    "Token_Identifier",
+    "Token_Comment",
+    "Token_MultilineComment",
+    "Token_EndOfLine",
+    "Token_Unknown",
+    "Token_EndOfStream",
+};
+
+struct token
+{
+    token_type Type;
+    u32 LineNumber;
+    string Text;
+    token* Next; // TODO(Peter): Get rid of this
+};
 
 ////////////////////////////////////////////////////////////////
 //        String Memory
@@ -43,33 +151,61 @@ struct contiguous_slot_count_result
 #if !defined GS_LANGUAGE_H
 
 static void    GSZeroMemory (u8* Memory, s32 Size);
-static s32     GSMin (s32 A, s32 B); 
-static s32     GSAbs (s32 A); 
+static s32     GSMin (s32 A, s32 B);
+static s32     GSAbs (s32 A);
 static float   GSAbsF (float A);
 static float   GSPowF (float N, s32 Power);
 
 #endif
 
 // Setup
-static void   InitializeString (string* String, char* Data, s32 DataSize);
-static string InitializeString (char* Data, s32 DataSize);
+
+#ifdef GS_MEMORY_H
+#define PushString(str, arena, size) (str)->Memory = PushArray(arena, char, size); (str)->Length = 0; (str)->Max = size;
+#endif
+
+static void   InitializeEmptyString (string* String, char* Data, s32 DataSize);
+static void   InitializeString(string* String, char* Data, s32 Used, s32 Max);
+static string InitializeEmptyString (char* Data, s32 DataSize);
+static string InitializeString (char* Data, s32 Used, s32 Max);
 static void   ClearString (string* String);
 
 // Character Values
 static bool     IsSlash (char C);
 static bool     IsNewline (char C);
 static bool     IsWhitespace (char C);
+static bool     IsNewlineOrWhitespace (char C);
 static bool     IsAlpha (char C);
 static bool     IsUpper (char C);
 static bool     IsLower (char C);
+static char     ToUpper (char C);
+static char     ToLower (char C);
 static bool     IsNumeric (char C);
-static bool     ToUpper (char C);
-static bool     ToLower (char C);
+static bool     IsNumericExtended (char C);
 static bool     IsAlphaNumeric (char C);
+static bool     IsOperator (char C);
+static bool     CharsEqualCaseInsensitive(char A, char B);
 
 // Tokenizing
+static void     EatChar(tokenizer* T);
+static b32      AtValidPosition(tokenizer Tokenizer);
+static b32      AtValidToken(tokenizer Tokenizer);
 static char*    EatToNewLine(char* C);
+static s32      EatToNewLine(tokenizer* T);
+static char*    EatPastNewLine(char* C);
+static s32      EatPastNewLine(tokenizer* T);
 static char*    EatWhitespace(char* C);
+static s32      EatWhitespace(tokenizer* T);
+static char*    EatToNonWhitespaceOrNewline(char* C);
+static s32      EatToNonWhitespaceOrNewline(tokenizer* T);
+static char*    EatToWhitespace(char* C);
+static s32      EatToWhitespace(tokenizer* T);
+static char*    EatToCharacter(char* C, char Char);
+static s32      EatToCharacter(tokenizer* T, char Char);
+static char*    EatPastCharacter(char* C, char Char);
+static s32      EatPastCharacter(tokenizer* T, char Char);
+static char*    EatNumber(char* C);
+static s32      EatNumber(tokenizer* T);
 
 // Char/Char Array
 static u32      CharToUInt (char C);
@@ -77,26 +213,37 @@ static s32      CharArrayLength (char* CharArray);
 static bool     CharArraysEqual (char* A, s32 ALength, char* B, s32 BLength);
 static bool     CharArraysEqualUnsafe (char* A, char* B);
 static void     ReverseCharArray (char* Array, s32 Length);
-#define         FirstIndexOfChar(array, find) IndexOfChar(array, 0, find)
+#define         FirstIndexOfCharInCharArray(array, find) IndexOfChar(array, 0, find)
 static s32      IndexOfChar (char* Array, s32 Start, char Find);
-#define         FastLastIndexOfChar(array, len, find) FastReverseIndexOfChar(array, len, 0, find)
+#define         FastLastIndexOfCharInCharArray(array, len, find) FastReverseIndexOfChar(array, len, 0, find)
 static s32      FastReverseIndexOfChar (char* Array, s32 Length, s32 OffsetFromEnd, char Find);
-#define         LastIndexOfChar(array, find) ReverseIndexOfChar(array, 0, find)
+#define         LastIndexOfCharInCharArray(array, find) ReverseIndexOfChar(array, 0, find)
 static s32      ReverseIndexOfChar (char* Array, s32 OffsetFromEnd, char Find);
 static b32      CharArrayContains(char* Array, char* CheckFor);
+static b32      CharArrayContainsSafe(char* Array, s32 ArrayLength, char* CheckFor, s32 CheckForLength);
 
 // String
+
+#define MakeStringBuffer(name, size) char name##Backbuffer[(size)]; string name = MakeString(name##Backbuffer, size);
+
+static string  MakeString (char* Array, s32 Length, s32 Max);
+static string  MakeString (char* Array, s32 Length);
+static string  MakeString (char* Array);
+static string  MakeStringLiteral(char* Data);
+
 static bool    StringsEqual (string A, string B);
+static bool    StringEqualsCharArray (string String, char* CharArray, s32 CharArrayLength);
 static bool    StringEqualsCharArray (string String, char* CharArray);
 static s32     FindFirstChar (string String, char C);
 
 static void    SetStringToChar (string* Dest, char C, s32 Count);
 static void    SetStringToCharArray (string* Dest, char* Source);
 
-static void    ConcatString (string* Dest, string Source);
-static void    ConcatString (string* Dest, string Source, s32 Length);
-static void    ConcatCharArrayToString (string* Dest, char* Source);
-static void    ConcatCharArrayToString (string* Dest, char* Source, s32 SourceLength);
+static void    ConcatString (string Source, string* Dest);
+static void    ConcatString (string Source, s32 Length, string* Dest);
+static void    ConcatCharToString(string* Dest, char C);
+static void    ConcatCharArrayToString (char* Source, string* Dest);
+static void    ConcatCharArrayToString (char* Source, s32 SourceLength, string* Dest);
 
 static void    CopyStringTo (string Source, string* Dest);
 static s32     CopyStringToCharArray (string Source, char* Dest, s32 DestLength);
@@ -109,21 +256,64 @@ static void    InsertChar (string* String, char Char, s32 Index);
 static void    InsertStringAt (string* Dest, string Source, s32 At);
 static void    RemoveCharAt (string* String, s32 Index);
 
+static s32     IndexOfChar(string String, char C);
+static s32     LastIndexOfChar(string String, char C);
+static s32     SearchForCharInSet(string String, char* Set);
+static s32     ReverseSearchForCharInSet(string String, char* Set);
 static string  Substring (string* String, s32 Start, s32 End);
 static string  Substring (string* String, s32 Start);
 
+static b32     StringContainsCharArray(string SearchIn, char* SearchFor, s32 SearchForLength);
+static b32     StringContainsString(string SearchIn, string SearchFor);
+static b32     StringContainsCharArrayCaseInsensitive(string SearchIn, char* SearchFor, s32 SearchForLength);
+static b32     StringContainsStringCaseInsensitive(string SearchIn, string SearchFor);
+
 static void    NullTerminate (string* String);
 
+static u32     HashString(string String);
 
 // Parsing
-static u32   ParseUnsignedInt (char* String, s32 Length);
-static s32   UIntToString (u32 Int, char* String, s32 Length);
-static s32   ParseSignedInt (char* String, s32 Length);
-static s32   IntToString (s32 Int, char* String, s32 Length);
-static s32   IntToString (s32 Int, char* String, s32 Length, s32 Offset);
-static float ParseFloat (char* String, s32 Length);
-static s32   FloatToString(float Float, char *String, s32 Length, s32 AfterPoint);
+enum parse_type
+{
+    ParseType_UnsignedInt,
+    ParseType_SignedInt,
+    ParseType_Float,
+};
 
+struct parse_result
+{
+    parse_type Type;
+    char* OnePastLast;
+    union
+    {
+        u32 UnsignedIntValue;
+        s32 SignedIntValue;
+        r32 FloatValue;
+    };
+};
+
+enum format_flags
+{
+    FormatFlags_LeftJustify = 0x1,
+    FormatFlags_ForceSign = 0x2,
+    FormatFlags_ForceSpaceInsteadOfSign = 0x4,
+    FormatFlags_ForceDecimalOrPrependOx = 0x8,
+    FormatFlags_PadWithZeroesInsteadOfSpaces = 0x16,
+};
+
+static parse_result ParseUnsignedInt (s32 Length, char* String);
+static parse_result ParseSignedInt (s32 Length, char* String);
+static parse_result ParseFloat (s32 Length, char* String);
+
+// PrintF
+
+#define StringExpand(str) (str).Length, (str).Memory
+static void PrintFArgList(char* Dest, s32 DestMax, char* Format, va_list Args);
+static void PrintF(string* String, char* Format, ...);
+
+// Printing Helper Functions
+static u32 GetU32NumberOfCharactersNeeded(u32 Value, u32 Base = 10);
+static u32 GetS32NumberOfCharactersNeeded(u32 Value, s32 Base = 10);
 
 ////////////////////////////////////////////////////////////////
 //        String Memory Function Declarations
@@ -184,20 +374,38 @@ GSPow (float N, s32 Power)
 ////////////////////////////////////////////////////////////////
 
 static void
-InitializeString (string* String, char* Data, s32 DataSize)
+InitializeEmptyString (string* String, char* Data, s32 DataSize)
 {
     String->Memory = Data;
     String->Max = DataSize;
     String->Length = 0;
 }
 
+static void
+InitializeString(string* String, char* Data, s32 Used, s32 Max)
+{
+    String->Memory = Data;
+    String->Max = Max;
+    String->Length = Used;
+}
+
 static string
-InitializeString (char* Data, s32 DataSize)
+InitializeEmptyString (char* Data, s32 DataSize)
 {
     string Result = {};
     Result.Memory = Data;
     Result.Max = DataSize;
     Result.Length = 0;
+    return Result;
+}
+
+static string
+InitializeString (char* Data, s32 Used, s32 Max)
+{
+    string Result = {};
+    Result.Memory = Data;
+    Result.Max = Max;
+    Result.Length = Used;
     return Result;
 }
 
@@ -215,11 +423,12 @@ ClearString (string* String)
 
 static bool IsSlash (char C) { return ((C == '\\') || (C == '/')); }
 static bool IsNewline (char C) { return (C == '\n') || (C == '\r'); }
-static bool IsWhitespace (char C) { return (C == ' ') || (C == '\t') || IsNewline(C); }
+static bool IsWhitespace (char C) { return (C == ' ') || (C == '\t'); }
+static bool IsNewlineOrWhitespace (char C) {  return (IsWhitespace(C) || IsNewline(C)); }
 static bool IsAlpha (char C)
 {
     // TODO(Peter): support UTF8 chars
-    return ((C >= 'A') && (C <= 'Z')) || ((C >= 'a') && (C <= 'z'));
+    return ((C >= 'A') && (C <= 'Z')) || ((C >= 'a') && (C <= 'z')) || (C == '_');
 }
 static bool IsUpper (char C)
 {
@@ -233,39 +442,236 @@ static bool IsNumeric (char C)
 {
     return (C >= '0') && (C <= '9');
 }
+static bool IsNumericExtended (char C)
+{
+    return (IsNumeric(C) || (C == 'x') || (C == 'f') || (C == '.'));
+}
 static bool IsAlphaNumeric (char C)
 {
     return IsAlpha(C) || IsNumeric(C);
+}
+static bool IsOperator (char C)
+{
+    return ((C == '+') ||
+            (C == '-') ||
+            (C == '*') ||
+            (C == '/') ||
+            (C == '=') ||
+            (C == '%') ||
+            (C == '<') ||
+            (C == '>'));
+}
+static char ToUpper (char A)
+{
+    char Result = A;
+    if (IsLower(A))
+    {
+        Result += 'A' - 'a';
+    }
+    return Result;
+}
+static char ToLower (char A)
+{
+    char Result = A;
+    if (IsUpper(A))
+    {
+        Result -= 'A' - 'a';
+    }
+    return Result;
+}
+static bool CharsEqualCaseInsensitive (char A, char B)
+{
+    b32 Result = (ToLower(A) == ToLower(B));
+    return Result;
 }
 
 ////////////////////////////////////////////////////////////////
 //        Tokenizing
 ////////////////////////////////////////////////////////////////
 
-static char*    
-EatToNewLine(char* C)
+static void
+EatChar (tokenizer* T)
 {
-    char* Result = C;
-    while (*Result && !IsNewline(*Result)) { Result++; }
-    if (*Result) { Result++; } // NOTE(Peter): eat past the newline character
+    if (AtValidPosition(*T))
+    {
+        if (IsNewline(*T->At))
+        {
+            T->LineNumber++;
+            T->At++;
+            T->LineStart = T->At;
+        }
+        else
+        {
+            T->At++;
+        }
+    }
+}
+
+static b32
+AtValidPosition (tokenizer Tokenizer)
+{
+    b32 Result = (Tokenizer.At - Tokenizer.Memory) <= Tokenizer.MemoryLength;
     return Result;
 }
 
-static char*    
+static b32
+AtValidToken(tokenizer Tokenizer)
+{
+    b32 Result = *Tokenizer.At && Tokenizer.At < (Tokenizer.Memory + Tokenizer.MemoryLength);
+    return Result;
+}
+
+static char*
+EatToNewLine(char* C)
+{
+    char* Result = C;
+    while (*Result && !IsNewline(*Result))
+    {
+        Result++;
+    }
+    return Result;
+}
+
+static s32
+EatToNewLine(tokenizer* T)
+{
+    char* TStart = T->At;
+    while (AtValidPosition(*T) && !IsNewline(*T->At))
+    {
+        EatChar(T);
+    }
+    return T->At - TStart;
+}
+
+static char*
+EatPastNewLine(char* C)
+{
+    char* Result = EatToNewLine(C);
+    while(*Result && IsNewline(*Result))
+    {
+        Result++;
+    }
+    return Result;
+}
+
+static s32
+EatPastNewLine(tokenizer* T)
+{
+    char* TStart = T->At;
+    
+    EatToNewLine(T);
+    while(AtValidPosition(*T) && IsNewline(*T->At))
+    {
+        EatChar(T);
+    }
+    
+    return T->At - TStart;
+}
+
+static char*
 EatWhitespace(char* C)
+{
+    char* Result = C;
+    while (*Result && IsNewlineOrWhitespace(*Result)) { Result++; }
+    return Result;
+}
+
+static s32
+EatWhitespace(tokenizer* T)
+{
+    char* TStart = T->At;
+    while (AtValidPosition(*T) && IsNewlineOrWhitespace(*T->At)) { EatChar(T); }
+    return T->At - TStart;
+}
+
+static char*
+EatToNonWhitespaceOrNewline(char* C)
 {
     char* Result = C;
     while (*Result && IsWhitespace(*Result)) { Result++; }
     return Result;
 }
 
+static s32
+EatToNonWhitespaceOrNewline(tokenizer* T)
+{
+    char* TStart = T->At;
+    while (AtValidPosition(*T) && IsWhitespace(*T->At)) { EatChar(T); }
+    return T->At - TStart;
+}
+
+static char*
+EatToWhitespace(char* C)
+{
+    char* Result = C;
+    while (*Result && !IsWhitespace(*Result)) { Result++; }
+    return Result;
+}
+
+static s32
+EatToWhitespace(tokenizer* T)
+{
+    char* TStart = T->At;
+    while (AtValidPosition(*T) && !IsWhitespace(*T->At)) { EatChar(T); }
+    return T->At - TStart;
+}
+
+static char*
+EatToCharacter(char* C, char Char)
+{
+    char* Result = C;
+    while (*Result && *Result != Char) { Result++; }
+    return Result;
+}
+
+static s32
+EatToCharacter(tokenizer* T, char Char)
+{
+    char* TStart = T->At;
+    while (AtValidPosition(*T) && *T->At != Char) { EatChar(T); }
+    return T->At - TStart;
+}
+
+static char*
+EatPastCharacter(char* C, char Char)
+{
+    char* Result = EatToCharacter(C, Char);
+    if (*Result && *Result == Char) { Result++; }
+    return Result;
+}
+
+static s32
+EatPastCharacter(tokenizer* T, char Char)
+{
+    char* TStart = T->At;
+    EatToCharacter(T, Char);
+    if (AtValidPosition(*T) && *T->At == Char) { EatChar(T); }
+    return T->At - TStart;
+}
+
+static char*
+EatNumber(char* C)
+{
+    char* Result = C;
+    while (*Result && IsNumericExtended(*Result)) { Result++; }
+    return Result;
+}
+
+static s32
+EatNumber(tokenizer* T)
+{
+    char* TStart = T->At;
+    while (AtValidPosition(*T) && IsNumericExtended(*T->At)) { EatChar(T); }
+    return T->At - TStart;
+}
+
 ////////////////////////////////////////////////////////////////
 //        Basic Char Operations
 ////////////////////////////////////////////////////////////////
 
-static u32 CharToUInt (char C) { 
+static u32 CharToUInt (char C) {
     u32 Result = (C - '0');
-    return Result; 
+    return Result;
 }
 
 static s32
@@ -281,7 +687,7 @@ CharArrayLength (char* Array)
     return Result;
 }
 
-static s32      
+static s32
 NullTerminatedCharArrayLength (char* CharArray)
 {
     char* Iter = CharArray;
@@ -337,6 +743,25 @@ CharArraysEqualUnsafe (char* A, char* B)
     return Result;
 }
 
+static bool
+CharArraysEqualUpToLength (char* A, char* B, s32 Length)
+{
+    bool Result = true;
+    
+    char* AIter = A;
+    char* BIter = B;
+    for (s32 i = 0; i < Length; i++)
+    {
+        if(*AIter++ != *BIter++)
+        {
+            Result = false;
+            break;
+        }
+    }
+    
+    return Result;
+}
+
 static void
 ReverseCharArray (char* Array, s32 Length)
 {
@@ -351,7 +776,7 @@ ReverseCharArray (char* Array, s32 Length)
     }
 }
 
-static s32 
+static s32
 IndexOfChar (char* Array, s32 After, char Find)
 {
     s32 Result = -1;
@@ -401,7 +826,7 @@ ReverseIndexOfChar (char* Array, s32 OffsetFromEnd, char Find)
     return FastReverseIndexOfChar(Array, StringLength, OffsetFromEnd, Find);
 }
 
-static b32      
+static b32
 CharArrayContains(char* Array, char* CheckFor)
 {
     b32 Result = false;
@@ -426,6 +851,40 @@ CharArrayContains(char* Array, char* CheckFor)
         }
         
         Src++;
+    }
+    
+    return Result;
+}
+
+static b32
+CharArrayContainsSafe(char* Array, s32 ArrayLength, char* CheckFor, s32 CheckForLength)
+{
+    b32 Result = false;
+    
+    if (ArrayLength >= CheckForLength)
+    {
+        char* Src = Array;
+        for (s32 s = 0; s < ArrayLength; s++)
+        {
+            if (*Src == *CheckFor && (s + CheckForLength <= ArrayLength))
+            {
+                char* A = CheckFor;
+                char* B = Src;
+                for (s32 d = 0; d < CheckForLength; d++)
+                {
+                    if (*B != *A) { break; }
+                    *B++; *A++;
+                }
+                
+                if (*A == 0)
+                {
+                    Result = true;
+                    break;
+                }
+            }
+            
+            Src++;
+        }
     }
     
     return Result;
@@ -458,7 +917,6 @@ StringsEqual (string A, string B)
     return Result;
 }
 
-#define MakeStringLiteral(array) MakeString((array), sizeof(array) - 1)
 static string
 MakeString (char* Array, s32 Length, s32 Max)
 {
@@ -486,26 +944,45 @@ MakeString (char* Array)
     return MakeString(Array, Length);
 }
 
-static bool
-StringEqualsCharArray (string String, char* CharArray)
+static string
+MakeStringLiteral (char* String)
 {
-    bool Result = true;
+    string Result = {};
+    Result.Memory = String;
+    Result.Max = CharArrayLength(String);
+    Result.Length = Result.Max;
+    return Result;
+}
+
+static bool
+StringEqualsCharArray (string String, char* CharArray, s32 CharArrayLength)
+{
+    bool Result = false;
     
-    char* S = String.Memory;
-    char* C = CharArray;
-    
-    s32 Count = 0;
-    while (*C && Count < String.Length)
+    if (CharArrayLength == String.Length)
     {
-        if (*C++ != *S++)
+        Result = true;
+        
+        char* S = String.Memory;
+        char* C = CharArray;
+        for (s32 i = 0; i < String.Length; i++)
         {
-            Result = false;
-            break;
+            if (*C++ != *S++)
+            {
+                Result = false;
+                break;
+            }
         }
-        Count++;
     }
     
     return Result;
+}
+
+static bool
+StringEqualsCharArray (string String, char* CharArray)
+{
+    s32 CLength = CharArrayLength(CharArray);
+    return StringEqualsCharArray(String, CharArray, CLength);
 }
 
 static s32
@@ -554,7 +1031,7 @@ SetStringToCharArray (string* Dest, char* Source)
 }
 
 static void
-ConcatString (string* Dest, string Source)
+ConcatString (string Source, string* Dest)
 {
     Assert((Dest->Length + Source.Length) <= Dest->Max);
     
@@ -568,9 +1045,9 @@ ConcatString (string* Dest, string Source)
 }
 
 static void
-ConcatString (string* Dest, string Source, s32 Length)
+ConcatString (string Source, s32 Length, string* Dest)
 {
-    Assert(Length < Source.Length);
+    Assert(Length <= Source.Length);
     Assert((Dest->Length + Length) <= Dest->Max);
     
     char* Dst = Dest->Memory + Dest->Length;
@@ -582,8 +1059,18 @@ ConcatString (string* Dest, string Source, s32 Length)
     }
 }
 
-static void    
-ConcatCharArrayToString (string* Dest, char* Source)
+static void
+ConcatCharToString (string* Dest, char C)
+{
+    Assert(Dest->Length + 1 <= Dest->Max);
+    
+    char* Dst = Dest->Memory + Dest->Length;
+    *Dst = C;
+    Dest->Length++;
+}
+
+static void
+ConcatCharArrayToString (char* Source, string* Dest)
 {
     Assert(CharArrayLength(Source) + Dest->Length <= Dest->Max);
     
@@ -597,8 +1084,8 @@ ConcatCharArrayToString (string* Dest, char* Source)
     }
 }
 
-static void    
-ConcatCharArrayToString (string* Dest, char* Source, s32 SourceLength)
+static void
+ConcatCharArrayToString (char* Source, s32 SourceLength, string* Dest)
 {
     Assert(SourceLength + Dest->Length <= Dest->Max);
     
@@ -624,7 +1111,7 @@ CopyStringTo (string Source, string* Dest)
     Dest->Length = Source.Length;
 }
 
-static s32    
+static s32
 CopyStringToCharArray (string Source, char* Dest, s32 DestLength)
 {
     char* Src = Source.Memory;
@@ -637,7 +1124,7 @@ CopyStringToCharArray (string Source, char* Dest, s32 DestLength)
     return CopyLength;
 }
 
-static void    
+static void
 CopyCharArrayToString (char* Source, string* Dest)
 {
     char* Src = Source;
@@ -648,10 +1135,11 @@ CopyCharArrayToString (char* Source, string* Dest)
         *Dst++ = *Src++;
         Copied++;
     }
+    *Dst++ = 0;
     Dest->Length = Copied;
 }
 
-static void    
+static void
 CopyCharArrayToString (char* Source, s32 SourceLength, string* Dest)
 {
     Assert(SourceLength <= Dest->Max);
@@ -662,6 +1150,7 @@ CopyCharArrayToString (char* Source, s32 SourceLength, string* Dest)
     {
         *Dst++ = *Src++;
     }
+    *Dst++ = 0;
     Dest->Length = SourceLength;
 }
 
@@ -670,7 +1159,7 @@ CopyCharArray (char* Source, char* Dest, s32 DestLength)
 {
     char* Src = Source;
     char* Dst = Dest;
-    s32 i = 0; 
+    s32 i = 0;
     while (*Src && i < DestLength)
     {
         *Dst++ = *Src++;
@@ -679,7 +1168,7 @@ CopyCharArray (char* Source, char* Dest, s32 DestLength)
     return i;
 }
 
-static s32    
+static s32
 CopyCharArrayAt (char* Source, char* Dest, s32 DestLength, s32 Offset)
 {
     Assert(Offset < DestLength);
@@ -701,7 +1190,7 @@ InsertChar (string* String, char Char, s32 Index)
     Assert(Index >= 0 && Index < String->Max);
     Assert(String->Length < String->Max);
     
-    char* Src = String->Memory + String->Length;
+    char* Src = String->Memory + String->Length - 1;
     char* Dst = Src + 1;
     for (int i = String->Length - 1; i >= Index; i--)
     {
@@ -727,26 +1216,187 @@ RemoveCharAt (string* String, s32 Index)
     String->Length--;
 }
 
-static string
-Substring (string* String, s32 Start, s32 End)
+static s32
+IndexOfChar(string String, char C)
 {
-    Assert(Start >= 0 && End > Start && End <= String->Length);
+    s32 Result = -1;
+    char* At = String.Memory;
+    for (s32 i = 0; i < String.Length; i++)
+    {
+        if (*At == C)
+        {
+            Result = i;
+            break;
+        }
+        At++;
+    }
+    return Result;
+}
+
+static s32
+LastIndexOfChar(string String, char C)
+{
+    s32 Result = -1;
+    char* At = String.Memory + String.Length - 1;
+    for (s32 i = 0; i < String.Length; i++)
+    {
+        if (*At == C)
+        {
+            Result = String.Length - i;
+            break;
+        }
+        At--;
+    }
+    return Result;
+}
+
+static s32
+SearchForCharInSet(string String, char* Set)
+{
+    s32 Index = -1;
+    
+    char* At = String.Memory;
+    for (s32 i = 0; i < String.Length; i++)
+    {
+        char* Needle = Set;
+        while (*Needle)
+        {
+            if (*At == *Needle)
+            {
+                Index = String.Length - i;
+                break;
+            }
+            
+            Needle++;
+        }
+        
+        if (Index >= 0)
+        {
+            break;
+        }
+        
+        At++;
+    }
+    
+    return Index;
+}
+
+static s32
+ReverseSearchForCharInSet(string String, char* Set)
+{
+    s32 Index = -1;
+    
+    for (s32 i = String.Length - 1; i >= 0; i--)
+    {
+        char* Needle = Set;
+        while (*Needle)
+        {
+            if (String.Memory[i] == *Needle)
+            {
+                Index = i;
+                break;
+            }
+            
+            Needle++;
+        }
+        
+        if (Index >= 0)
+        {
+            break;
+        }
+    }
+    
+    return Index;
+}
+
+static string
+Substring (string String, s32 Start, s32 End)
+{
+    Assert(Start >= 0 && End > Start && End <= String.Length);
     
     string Result = {};
-    Result.Memory = String->Memory + Start;
+    Result.Memory = String.Memory + Start;
     Result.Length = End - Start;
     return Result;
 }
 
 static string
-Substring (string* String, s32 Start)
+Substring (string String, s32 Start)
 {
-    Assert(Start >= 0 && Start < String->Length);
+    Assert(Start >= 0 && Start < String.Length);
     
     string Result = {};
-    Result.Memory = String->Memory + Start;
-    Result.Length = String->Length - Start;
+    Result.Memory = String.Memory + Start;
+    Result.Length = String.Length - Start;
     return Result;
+}
+
+static b32
+StringContainsCharArray(string SearchIn, char* SearchFor, s32 SearchForLength)
+{
+    b32 Result = false;
+    
+    char* SearchInAt = SearchIn.Memory;
+    for (s32 i = 0; i < (SearchIn.Length - SearchForLength) + 1; i++)
+    {
+        char* InAt = SearchInAt;
+        char* ForAt = SearchFor;
+        s32 LengthMatch = 0;
+        while (*InAt == *ForAt)
+        {
+            InAt++;
+            ForAt++;
+            LengthMatch++;
+        }
+        if (LengthMatch == SearchForLength)
+        {
+            Result = true;
+            break;
+        }
+        SearchInAt++;
+    }
+    
+    return Result;
+}
+
+static b32
+StringContainsString(string SearchIn, string SearchFor)
+{
+    return StringContainsCharArray(SearchIn, SearchFor.Memory, SearchFor.Length);
+}
+
+static b32
+StringContainsCharArrayCaseInsensitive(string SearchIn, char* SearchFor, s32 SearchForLength)
+{
+    b32 Result = false;
+    
+    char* SearchInAt = SearchIn.Memory;
+    for (s32 i = 0; i < (SearchIn.Length - SearchForLength) + 1; i++)
+    {
+        char* InAt = SearchInAt;
+        char* ForAt = SearchFor;
+        s32 LengthMatch = 0;
+        while (CharsEqualCaseInsensitive(*InAt, *ForAt))
+        {
+            InAt++;
+            ForAt++;
+            LengthMatch++;
+        }
+        if (LengthMatch == SearchForLength)
+        {
+            Result = true;
+            break;
+        }
+        SearchInAt++;
+    }
+    
+    return Result;
+}
+
+static b32
+StringContainsStringCaseInsensitive(string SearchIn, string SearchFor)
+{
+    return StringContainsCharArrayCaseInsensitive(SearchIn, SearchFor.Memory, SearchFor.Length);
 }
 
 static void
@@ -757,7 +1407,20 @@ NullTerminate (string* String)
     String->Length++;
 }
 
-static void    
+// http://www.cse.yorku.ca/~oz/hash.html
+// djb2 hash
+static u32
+HashString(string String)
+{
+    u32 Hash = 5381;
+    for (s32 i = 0; i < String.Length; i++)
+    {
+        Hash = ((Hash << 5) + Hash) + (u32)String.Memory[i]; /* hash * 33 + c */
+    }
+    return Hash;
+}
+
+static void
 InsertStringAt (string* Dest, string Source, s32 At)
 {
     Assert(At + Source.Length < Dest->Max);
@@ -784,121 +1447,107 @@ InsertStringAt (string* Dest, string Source, s32 At)
 //        String Parsing
 ////////////////////////////////////////////////////////////////
 
-static u32
-ParseUnsignedInt (char* String, s32 Length)
+// NOTE(Peter): parameters are all in order Length, String because
+// that matches the order of C's printf %.*s format specifier. This
+// is convenient because you can use StringExpand to parse a string
+// struct
+// :StringExpandNote
+static parse_result
+ParseUnsignedInt (s32 Length, char* String)
 {
     Assert(IsNumeric(*String));
+    parse_result Result = {};
+    Result.Type = ParseType_UnsignedInt;
     
     char* Iter = String;
-    u32 Result = 0;
+    u32 ResultValue = 0;
     for (s32 i = 0; i < Length; i++)
     {
-        Result = CharToUInt(*Iter++) + (Result * 10);
+        ResultValue = CharToUInt(*Iter++) + (ResultValue * 10);
     }
+    
+    Result.UnsignedIntValue = ResultValue;
+    Result.OnePastLast = Iter;
+    
     return Result;
 }
 
-static s32
-UIntToString (u32 Int, char* String, s32 Length)
+static parse_result
+ParseUnsignedIntUnsafe (char* String)
 {
-    s32 Remaining = Int;
-    s32 CharsCopied = 0;
-    char* Iter = String;
-    while (Remaining > 0 && CharsCopied < Length)
-    {
-        *Iter++ = '0' + (Remaining % 10);
-        Remaining /= 10;
-        CharsCopied++;
-    }
-    ReverseCharArray(String, CharsCopied);
-    return CharsCopied;
+    char* Start = String;
+    char* End = EatNumber(String + 1);
+    return ParseUnsignedInt(End - Start, String);
 }
 
-static s32
-ParseSignedInt (char* String, s32 Length)
+// :StringExpandNote
+static parse_result
+ParseSignedInt (s32 Length, char* String)
 {
     Assert(Length > 0);
+    parse_result Result = {};
+    Result.Type = ParseType_SignedInt;
     
     s32 Negative = 1;
     s32 LengthRemaining = Length;
-    s32 Result = 0;
+    s32 ResultValue = 0;
     char* Iter = String;
     
-    if (*Iter == '-') { 
+    if (*Iter == '-') {
         LengthRemaining--;
-        *Iter++; 
-        Negative = -1; 
+        *Iter++;
+        Negative = -1;
     }
     
     for (s32 i = 0; i < LengthRemaining; i++)
     {
-        Result = CharToUInt(*Iter++) + (Result * 10);
+        ResultValue = CharToUInt(*Iter++) + (ResultValue * 10);
     }
     
-    Result *= Negative;
+    ResultValue *= Negative;
+    
+    Result.SignedIntValue = ResultValue;
+    Result.OnePastLast = Iter;
     
     return Result;
 }
 
-static s32
-IntToString (s32 Int, char* String, s32 Length)
+static parse_result
+ParseSignedIntUnsafe (char* String)
 {
-    s32 Remaining = Int;
-    s32 CharsCopied = 0;
-    char* Iter = String;
-    
-    bool Negative = Remaining < 0;
-    Remaining = GSAbs(Remaining);
-    
-    while (Remaining > 0 && CharsCopied < Length)
-    {
-        *Iter++ = '0' + (Remaining % 10);
-        Remaining /= 10;
-        CharsCopied++;
-    }
-    
-    if (Negative)
-    {
-        *Iter++ = '-';
-        CharsCopied++;
-    }
-    
-    ReverseCharArray(String, CharsCopied);
-    return CharsCopied;
+    char* Start = String;
+    char* End = EatNumber(String + 1);
+    return ParseSignedInt(End - Start, String);
 }
 
-static s32 
-IntToString (s32 Int, char* String, s32 Length, s32 Offset)
+// :StringExpandNote
+static parse_result
+ParseFloat (s32 Length, char* String)
 {
-    char* StringStart = String + Offset;
-    s32 LengthWritten = IntToString(Int, StringStart, Length - Offset);
-    return LengthWritten;
-}
-
-static float
-ParseFloat (char* String, s32 Length)
-{
+    parse_result Result = {};
+    Result.Type = ParseType_Float;
+    
     s32 Negative = 1;
     s32 LengthRemaining = Length;
-    float Result = 0;
+    float ResultValue = 0;
     char* Iter = String;
     
-    if (*Iter == '-') { 
+    if (*Iter == '-') {
         LengthRemaining--;
-        *Iter++; 
-        Negative = -1; 
+        *Iter++;
+        Negative = -1;
     }
     
     for (s32 i = 0; i < LengthRemaining; i++)
     {
         if (IsNumeric(*Iter))
         {
-            Result = (float)CharToUInt(*Iter++) + (Result * 10);
+            ResultValue = (float)CharToUInt(*Iter++) + (ResultValue * 10);
         }
-        else if (*Iter == '.' || *Iter == 0) 
-        { 
+        else if (*Iter == '.' || *Iter == 0)
+        {
             LengthRemaining -= i;
-            break; 
+            break;
         }
     }
     
@@ -922,28 +1571,97 @@ ParseFloat (char* String, s32 Length)
         }
         
         AfterPoint = AfterPoint / GSPow(10, PlacesAfterPoint);
-        Result += AfterPoint;
+        ResultValue += AfterPoint;
     }
     
-    Result *= Negative;
+    ResultValue *= Negative;
+    
+    Result.FloatValue = ResultValue;
+    Result.OnePastLast = Iter;
     
     return Result;
 }
 
+static parse_result
+ParseFloatUnsafe (char* String)
+{
+    char* Start = String;
+    char* End = EatNumber(String + 1);
+    return ParseFloat(End - Start, String);
+}
+
 static s32
-FloatToString(float Float, char *String, s32 Length, s32 AfterPoint)
+UIntToString (u32 Int, char* String, s32 MaxLength, b32 FormatFlags = 0, s32 MinimumLength = 0)
+{
+    s32 Remaining = Int;
+    char* Iter = String;
+    while (Remaining > 0 && (Iter - String) < MaxLength)
+    {
+        *Iter++ = '0' + (Remaining % 10);
+        Remaining /= 10;
+    }
+    s32 CharsCopied = Iter - String;
+    ReverseCharArray(String, CharsCopied);
+    return CharsCopied;
+}
+
+static s32
+IntToString (s32 Int, char* String, s32 MaxLength, b32 FormatFlags = 0, s32 MinimumLength = 0)
+{
+    s32 Remaining = Int;
+    s32 CharsCopied = 0;
+    
+    char* Iter = String;
+    
+    bool Negative = Remaining < 0;
+    Remaining = GSAbs(Remaining);
+    
+    if (Remaining > 0)
+    {
+        while (Remaining > 0 && CharsCopied < MaxLength)
+        {
+            *Iter++ = '0' + (Remaining % 10);
+            Remaining /= 10;
+            CharsCopied++;
+        }
+    }
+    else if (Remaining == 0)
+    {
+        *Iter++ = '0';
+    }
+    
+    if (Negative)
+    {
+        *Iter++ = '-';
+        CharsCopied++;
+    }
+    
+    ReverseCharArray(String, CharsCopied);
+    return CharsCopied;
+}
+
+static s32
+IntToString (s32 Int, char* String, s32 MaxLength, s32 Offset, b32 FormatFlags = 0, s32 MinimumWidth = 0)
+{
+    char* StringStart = String + Offset;
+    s32 LengthWritten = IntToString(Int, StringStart, MaxLength - Offset);
+    return LengthWritten;
+}
+
+static s32
+FloatToString(float Float, char *String, s32 MaxLength, s32 AfterPoint = 0, b32 FormatFlags = 0, s32 MinimumWidth = 0)
 {
     s32 IPart = (s32)Float;
     float FPart = GSAbs(Float - (float)IPart);
     
-    s32 i = IntToString(IPart, String, Length);
+    s32 i = IntToString(IPart, String, MaxLength);
     
     if (AfterPoint > 1)
     {
         String[i++] = '.';
         
         s32 FPartInt = FPart * GSPow(10, AfterPoint);
-        i += IntToString(FPartInt, String, Length, i);
+        i += IntToString(FPartInt, String, MaxLength, i, 0, 0);
     }
     
     return i;
@@ -953,69 +1671,391 @@ FloatToString(float Float, char *String, s32 Length, s32 AfterPoint)
 //        PrintF
 ////////////////////////////////////////////////////////////////
 
+static void
+OutChar (string* String, char C)
+{
+    if (String->Length < String->Max)
+    {
+        String->Memory[String->Length] = C;
+        String->Length++;
+    }
+}
+
+char OctalDigits[] = "01234567";
+char DecimalDigits[] = "0123456789";
+char HexDigits[] = "0123456789ABCDEF";
+
+static void
+U64ToASCII (string* String, u64 Value, s32 Base, char* Digits)
+{
+    u64 ValueRemaining = Value;
+    char* Start = String->Memory + String->Length;
+    do {
+        s32 DigitsIndex = ValueRemaining % Base;
+        char Digit = Digits[DigitsIndex];
+        OutChar(String, Digit);
+        ValueRemaining /= Base;
+    }while (ValueRemaining);
+    char* End = String->Memory + String->Length;
+    
+    while (Start < End)
+    {
+        End--;
+        char Temp = *End;
+        *End = *Start;
+        *Start = Temp;
+        *Start++;
+    }
+}
+
+static void
+F64ToASCII (string* String, r64 Value, s32 Precision)
+{
+    if (Value < 0)
+    {
+        OutChar(String, '-');
+        Value = -Value;
+    }
+    
+    u64 IntegerPart = (u64)Value;
+    Value -= IntegerPart;
+    
+    U64ToASCII(String, IntegerPart, 10, DecimalDigits);
+    
+    OutChar(String, '.');
+    
+    for (s32 i = 0; i < Precision; i++)
+    {
+        Value *= 10.f;
+        u32 DecimalPlace = Value;
+        Value -= DecimalPlace;
+        OutChar(String, DecimalDigits[DecimalPlace]);
+    }
+}
+
+internal s64
+ReadVarArgsSignedInteger (s32 Width, va_list* Args)
+{
+    s64 Result = 0;
+    switch (Width)
+    {
+        case 1: { Result = (s64)va_arg(*Args, s8); } break;
+        case 2: { Result = (s64)va_arg(*Args, s16); } break;
+        case 4: { Result = (s64)va_arg(*Args, s32); } break;
+        case 8: { Result = (s64)va_arg(*Args, s64); } break;
+        InvalidDefaultCase;
+    }
+    return Result;
+}
+
+internal r64
+ReadVarArgsUnsignedInteger (s32 Width, va_list* Args)
+{
+    u64 Result = 0;
+    switch (Width)
+    {
+        case 1: { Result = (u64)va_arg(*Args, u8); } break;
+        case 2: { Result = (u64)va_arg(*Args, u16); } break;
+        case 4: { Result = (u64)va_arg(*Args, u32); } break;
+        case 8: { Result = (u64)va_arg(*Args, u64); } break;
+        InvalidDefaultCase;
+    }
+    return Result;
+}
+
+internal r64
+ReadVarArgsFloat (s32 Width, va_list* Args)
+{
+    r64 Result = 0;
+    switch (Width)
+    {
+        case 4: { Result = (r64)va_arg(*Args, r64); } break;
+        case 8: { Result = (r64)va_arg(*Args, r64); } break;
+        InvalidDefaultCase;
+    }
+    return Result;
+}
 
 internal s32
-PrintStringF(char* Format, char* Destination, s32 DestLength, ...)
+PrintFArgsList (char* Dest, s32 DestMax, char* Format, va_list Args)
 {
-    va_list Args;
-    va_start(Args, DestLength);
+    char* DestAt = Dest;
     
-    s32 LengthPrinted = 0;
-    char* DestChar = Destination;
-    
-    char* C = Format;
-    while(*C)
+    char* FormatAt = Format;
+    while (*FormatAt)
     {
-        if (*C == '%')
+        if (FormatAt[0] != '%')
         {
-            C++;
-            if (*C == 's') // string
-            {
-                C++;
-                char* InsertString = va_arg(Args, char*);
-                s32 LengthCopied = CopyCharArray(InsertString, DestChar, DestLength - LengthPrinted);
-                DestChar += LengthCopied;
-                LengthPrinted += LengthCopied;
-            }
-            else if(*C == 'd') // integer
-            {
-                C++;
-                s32 Integer = va_arg(Args, s32);
-                
-                s32 IntLength = IntToString(Integer, DestChar, DestLength - LengthPrinted);
-                DestChar += IntLength;
-                LengthPrinted += IntLength;
-            }
-            else if (*C == 'f')
-            {
-                C++;
-                r32 Float = va_arg(Args, r32);
-                s32 FloatLength = FloatToString(Float, DestChar, DestLength - LengthPrinted, 5);
-                DestChar += FloatLength;
-                LengthPrinted += FloatLength;
-            }
-            else
-            {
-                *DestChar++ = *C++;
-            }
+            *DestAt++ = *FormatAt++;
+        }
+        else if (FormatAt[0] == '%' && FormatAt[1] == '%')  // Print the % symbol
+        {
+            *DestAt++ = '%';
+            FormatAt += 2;
         }
         else
         {
-            *DestChar++ = *C++;
+            FormatAt++;
+            
+            // Flags
+            if (FormatAt[0] == '-')
+            {
+                FormatAt++;
+            }
+            else if (FormatAt[0] == '+')
+            {
+                FormatAt++;
+            }
+            else if (FormatAt[0] == ' ')
+            {
+                FormatAt++;
+            }
+            else if (FormatAt[0] == '#')
+            {
+                FormatAt++;
+            }
+            else if (FormatAt[0] == '0')
+            {
+                FormatAt++;
+            }
+            
+            // Width
+            b32 WidthSpecified = false;
+            s32 Width = 0;
+            
+            if (IsNumeric(FormatAt[0]))
+            {
+                WidthSpecified = true;
+                parse_result Parse = ParseSignedIntUnsafe(FormatAt);
+                FormatAt = Parse.OnePastLast;
+                Width = Parse.SignedIntValue;
+            }
+            else if (FormatAt[0] == '*')
+            {
+                WidthSpecified = true;
+                Width = va_arg(Args, s32);
+                Assert(Width >= 0);
+                FormatAt++;
+            }
+            
+            // Precision
+            b32 PrecisionSpecified = false;
+            s32 Precision = 0;
+            
+            if (FormatAt[0] == '.')
+            {
+                FormatAt++;
+                if (IsNumeric(FormatAt[0]))
+                {
+                    PrecisionSpecified = true;
+                    parse_result Parse = ParseSignedIntUnsafe(FormatAt);
+                    FormatAt = Parse.OnePastLast;
+                    Precision = Parse.SignedIntValue;
+                }
+                else if (FormatAt[0] == '*')
+                {
+                    PrecisionSpecified = true;
+                    Precision = va_arg(Args, s32);
+                    Assert(Precision >= 0);
+                    FormatAt++;
+                }
+            }
+            
+            // Length
+            b32 LengthSpecified = false;
+            s32 Length = 4;
+            
+            if (FormatAt[0] == 'h' && FormatAt[1] == 'h')
+            {
+                LengthSpecified = true;
+                LengthSpecified = 1;
+                FormatAt += 2;
+            }
+            else if (FormatAt[0] == 'h')
+            {
+                LengthSpecified = true;
+                LengthSpecified = 2;
+                FormatAt++;
+            }
+            else if (FormatAt[0] == 'l' && FormatAt[1] == 'l')
+            {
+                LengthSpecified = true;
+                LengthSpecified = 8;
+                FormatAt += 2;
+            }
+            else if (FormatAt[0] == 'l')
+            {
+                LengthSpecified = true;
+                LengthSpecified = 4;
+                FormatAt++;
+            }
+            else if (FormatAt[0] == 'j')
+            {
+                LengthSpecified = true;
+                LengthSpecified = 8;
+                FormatAt++;
+            }
+            else if (FormatAt[0] == 'z')
+            {
+                FormatAt++;
+            }
+            else if (FormatAt[0] == 't')
+            {
+                FormatAt++;
+            }
+            else if (FormatAt[0] == 'L')
+            {
+                FormatAt++;
+            }
+            
+            // Format Specifier
+            s32 DestLengthRemaining = DestMax - (DestAt - Dest);
+            
+            char Temp[64];
+            string TempDest = MakeString(Temp, 0, 64);
+            
+            if (FormatAt[0] == 'd' || FormatAt[0] == 'i')
+            {
+                s64 SignedInt = ReadVarArgsSignedInteger(Length, &Args);
+                if (SignedInt < 0)
+                {
+                    OutChar(&TempDest, '-');
+                    SignedInt *= -1;
+                }
+                U64ToASCII(&TempDest, (u64)SignedInt, 10, DecimalDigits);
+            }
+            else if (FormatAt[0] == 'u')
+            {
+                u32 UnsignedInt = ReadVarArgsUnsignedInteger(Length, &Args);
+                U64ToASCII(&TempDest, UnsignedInt, 10, DecimalDigits);
+            }
+            else if (FormatAt[0] == 'o')
+            {
+                u32 UnsignedInt = ReadVarArgsUnsignedInteger(Length, &Args);
+                U64ToASCII(&TempDest, UnsignedInt, 8, OctalDigits);
+            }
+            else if (FormatAt[0] == 'x' || FormatAt[0] == 'X')
+            {
+                u32 UnsignedInt = ReadVarArgsUnsignedInteger(Length, &Args);
+                U64ToASCII(&TempDest, UnsignedInt, 16, HexDigits);
+            }
+            else if (FormatAt[0] == 'f' || FormatAt[0] == 'F')
+            {
+                r64 Float = ReadVarArgsFloat(Length, &Args);
+                s32 AfterPoint = 6;
+                if (PrecisionSpecified)
+                {
+                    AfterPoint = Precision;
+                }
+                F64ToASCII(&TempDest, Float, AfterPoint);
+            }
+            else if (FormatAt[0] == 'c')
+            {
+                char InsertChar = va_arg(Args, char);
+                OutChar(&TempDest, InsertChar);
+            }
+            else if (FormatAt[0] == 's')
+            {
+                char* InsertString = va_arg(Args, char*);
+                
+                s32 InsertStringLength = CharArrayLength(InsertString);
+                if (PrecisionSpecified)
+                {
+                    InsertStringLength = GSMin(InsertStringLength, Precision);
+                }
+                InsertStringLength = GSMin(DestLengthRemaining, InsertStringLength);
+                
+                for (s32 c = 0; c < InsertStringLength; c++)
+                {
+                    OutChar(&TempDest, *InsertString++);
+                }
+            }
+            else if (FormatAt[0] == 'S')
+            {
+                string InsertString = va_arg(Args, string);
+                
+                for (s32 c = 0; c < InsertString.Length; c++)
+                {
+                    OutChar(&TempDest, InsertString.Memory[c]);
+                }
+            }
+            else if (FormatAt[0] == 'p')
+            {
+                // TODO(Peter): Pointer Address
+            }
+            else
+            {
+                // NOTE(Peter): Non-specifier character found
+                InvalidCodePath;
+            }
+            
+            for (s32 i = 0; i < TempDest.Length; i++)
+            {
+                *DestAt++ = TempDest.Memory[i];
+            }
+            
+            *FormatAt++;
         }
     }
     
-    if (LengthPrinted >= DestLength)
-    {
-        LengthPrinted = DestLength - 1;
-    }
-    *(Destination + LengthPrinted) = 0;
-    
-    va_end(Args);
-    
-    return LengthPrinted;
+    s32 FormattedLength = DestAt - Dest;
+    return FormattedLength;
 }
 
+static void
+PrintF (string* String, char* Format, ...)
+{
+    va_list Args;
+    va_start(Args, Format);
+    String->Length = 0;
+    String->Length += PrintFArgsList(String->Memory + String->Length, String->Max - String->Length, Format, Args);
+    va_end(Args);
+}
+
+static void
+AppendPrintF (string* String, char* Format, ...)
+{
+    va_list Args;
+    va_start(Args, Format);
+    String->Length += PrintFArgsList(String->Memory + String->Length, String->Max - String->Length, Format, Args);
+    va_end(Args);
+}
+
+// Printing Helper Functions
+static u32
+GetU32NumberOfCharactersNeeded(u32 Value, u32 Base)
+{
+    u32 Result = 0;
+    u32 ValueLeft = Value;
+    // NOTE(Peter): This is in a do while loop because even if the number is 0,
+    // it'll still take one character to display that.
+    do
+    {
+        Result += 1;
+        ValueLeft /= Base;
+    }while (ValueLeft > 0);
+    return Result;
+}
+
+static u32
+GetS32NumberOfCharactersNeeded(s32 Value, s32 Base)
+{
+    u32 Result = 0;
+    s32 ValueLeft = Value;
+    if (Value < 0)
+    {
+        Result += 1;
+        ValueLeft = Value * -1;
+    }
+    // NOTE(Peter): This is in a do while loop because even if the number is 0,
+    // it'll still take one character to display that.
+    do
+    {
+        Result += 1;
+        ValueLeft /= Base;
+    }while (ValueLeft > 0);
+    return Result;
+}
 
 ////////////////////////////////////////////////////////////////
 //        String Memory Function Definitions
@@ -1096,8 +2136,8 @@ InsertSlotIntoList (slot_header* NewSlot, slot_header* ListStart)
         }
         
         Assert(PrevIter);
-        if (PrevIter) 
-        { 
+        if (PrevIter)
+        {
             PrevIter->Next = NewSlot;
         }
         
@@ -1134,7 +2174,7 @@ AllocStringFromStringArena (string* String, s32 Size, slot_arena* Storage)
         else
         {
             PrevSlot = Slot;
-            Slot = Slot->Next; 
+            Slot = Slot->Next;
         }
     }
     
@@ -1200,6 +2240,10 @@ void DEBUGPrintChars (string* String, s32 Count)
     String->Length = Count;
 }
 
+#ifdef DEBUG_GS_STRING
+
+#include <stdlib.h>
+
 static void
 TestStrings()
 {
@@ -1259,7 +2303,7 @@ TestStrings()
     
     StringArena.SlotSize = 256;
     StringArena.SlotCount = 32;
-    StringArena.Memory = Allocate(StringArena.SlotSize * StringArena.SlotCount);
+    StringArena.Memory = malloc(StringArena.SlotSize * StringArena.SlotCount);
     slot_header* PrevSlotHeader = 0;
     for (int i = StringArena.SlotCount - 1; i >= 0; i--)
     {
@@ -1307,7 +2351,7 @@ TestStrings()
     string RandomMemString = {};
     RandomMemString.Memory = (char*)RandomMemory;
     RandomMemString.Max = 256;
-    FreeToStringArena(&RandomMemString, &StringArena); 
+    FreeToStringArena(&RandomMemString, &StringArena);
 #endif
     FreeToStringArena(&StringA, &StringArena);
     FreeToStringArena(&StringB, &StringArena);
@@ -1340,7 +2384,7 @@ TestStrings()
     string EqualityStringA = AllocStringFromStringArena(345, &StringArena);
     string EqualityStringB = AllocStringFromStringArena(415, &StringArena);
     // Equality should succeed despite length differences
-    string EqualityStringC = AllocStringFromStringArena(256, &StringArena); 
+    string EqualityStringC = AllocStringFromStringArena(256, &StringArena);
     string EqualityStringD = AllocStringFromStringArena(256, &StringArena); // Equality should fail
     string EqualityStringEmpty = {};
     
@@ -1377,4 +2421,9 @@ TestStrings()
     
     DebugPrint("Results: Passed %d / %d\n\n\n", SuccessCount, TestCount);
 }
+#endif // DEBUG_GS_STRING
+
 #endif // DEBUG
+
+#define GS_STRING_H
+#endif // GS_STRING_H
