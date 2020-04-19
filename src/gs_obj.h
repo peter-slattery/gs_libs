@@ -5,6 +5,10 @@
 //
 #ifndef GS_OBJ_H
 
+#ifndef GS_TYPES_H
+# error "gs_obj.h relies on gs_types.h. Please include gs_types.h before gs_obj.h"
+#endif
+
 enum gso_vertex_packing
 {
     gso_VertexPacking_Position = 1 << 0,

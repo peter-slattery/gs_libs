@@ -6,35 +6,27 @@ TODO
 
 #ifndef GS_RADIX_SORT_H
 
-#ifdef DEBUG
-#if !defined(GSRad_Assert)
-#define GSRad_Assert(expression) \
-if(!(expression)) { \
-*((int *)0) = 5; \
-}
-#endif // !defined(GSRad_Assert)
-#endif // DEBUG
-
-typedef unsigned int gs_rad_u32;
-typedef unsigned int gs_rad_b32;
+#ifndef GS_TYPES_H
+# error "gs_radix_sort.h relies on gs_types.h. Please include gs_types.h before gs_radix_sort."
+#endif
 
 struct gs_radix_entry
 {
-    gs_rad_u32 Radix;
-    gs_rad_u32 ID;
+    u32 Radix;
+    u32 ID;
 };
 
 static void
-RadixSortInPlace_ (gs_radix_entry* Data, gs_rad_u32 Start, gs_rad_u32 End, gs_rad_u32 Iteration)
+RadixSortInPlace_ (gs_radix_entry* Data, u32 Start, u32 End, u32 Iteration)
 {
-    gs_rad_u32 Shift = Iteration;
-    gs_rad_u32 ZerosBoundary = Start;
-    gs_rad_u32 OnesBoundary = End - 1;
+    u32 Shift = Iteration;
+    u32 ZerosBoundary = Start;
+    u32 OnesBoundary = End - 1;
     
-    for (gs_rad_u32 d = Start; d < End; d++)
+    for (u32 d = Start; d < End; d++)
     {
         gs_radix_entry Entry = Data[ZerosBoundary];
-        gs_rad_u32 Place = (Entry.Radix >> Shift) & 0x1;
+        u32 Place = (Entry.Radix >> Shift) & 0x1;
         if (Place)
         {
             gs_radix_entry Evicted = Data[OnesBoundary];
@@ -56,10 +48,10 @@ RadixSortInPlace_ (gs_radix_entry* Data, gs_rad_u32 Start, gs_rad_u32 End, gs_ra
 }
 
 static void
-RadixSortInPlace (gs_radix_entry* Data, gs_rad_u32 Count)
+RadixSortInPlace (gs_radix_entry* Data, u32 Count)
 {
-    gs_rad_u32 Highest = 0;
-    for (gs_rad_u32 i = 0; i < Count; i++)
+    u32 Highest = 0;
+    for (u32 i = 0; i < Count; i++)
     {
         if (Data[i].Radix > Highest)
         {
@@ -67,7 +59,7 @@ RadixSortInPlace (gs_radix_entry* Data, gs_rad_u32 Count)
         }
     }
     
-    gs_rad_u32 Iterations = 0;
+    u32 Iterations = 0;
     while (Highest > 1)
     {
         ++Iterations;

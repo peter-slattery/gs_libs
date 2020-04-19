@@ -6,10 +6,17 @@
 #ifndef GS_ASSET_SYSTEM_H
 
 // DEPENDENCIES
-#include "gs_obj.h"
+#ifndef GS_TYPES_H
+# error "gs_asset_system.h relies on gs_types.h. Please include gs_types.h before gs_asset_system."
+#endif
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "..\stb\stb_image.h"
+#ifndef GS_OBJ_H
+# error "gs_asset_system.h relies on gs_obj.h. Please include gs_obj.h before gs_asset_system."
+#endif
+
+#ifndef STB_IMAGE_IMPLEMENTATION
+# error "gs_asset_system.h relies on stb_image.h. Please include stb_image.h before gs_asset_system."
+#endif
 
 // TODO(Peter): Store all assets a homogonous data
 // Create a block_memory_arena, which allocates and frees in blocks of fixed size

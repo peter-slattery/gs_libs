@@ -20,6 +20,10 @@
 //
 #ifndef GS_TIME_H
 
+#ifndef GS_TYPES_H
+# error ""
+#endif
+
 typedef struct gs_time_info gs_time_info;
 typedef long long int gs_time_stamp;
 

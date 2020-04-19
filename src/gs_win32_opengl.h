@@ -10,66 +10,8 @@
 //
 #ifndef WIN32_OPENGL_H
 
-#ifndef GS_TYPES
-
-#define GSINT64(s) (s) ## L
-#define GSUINT64(s) (s) ## UL
-
-typedef signed char    b8;
-typedef short int      b16;
-typedef int            b32;
-typedef long long int  b64;
-
-typedef unsigned char          u8;
-typedef unsigned short int     u16;
-typedef unsigned int           u32;
-typedef unsigned long long int u64;
-
-typedef signed char   s8;
-typedef short int     s16;
-typedef int           s32;
-typedef long long int s64;
-
-typedef float  r32;
-typedef double r64;
-
-#ifndef _STDINT
-
-#define INT8_MIN   (-128)
-#define INT16_MIN  (-32767-1)
-#define INT32_MIN  (-2147483647-1)
-#define INT64_MIN  (-GSINT64(9223372036854775807)-1)
-
-#define INT8_MAX   (127)
-#define INT16_MAX  (32767)
-#define INT32_MAX  (2147483647)
-#define INT64_MAX  (GSINT64(9223372036854775807))
-
-#define UINT8_MAX  (255)
-#define UINT16_MAX (65535)
-#define UINT32_MAX (4294967295U)
-#define UINT64_MAX (GSUINT64(18446744073709551615))
-
-#endif // _STDINT
-
-#define FLOAT_MIN  (1.175494351e-38F)
-#define FLOAT_MAX  (3.402823466e+38F)
-#define DOUBLE_MIN (2.2250738585072014e-308)
-#define DOUBLE_MAX (1.7976931348623158e+308)
-
-#define Kilobytes(Value) ((Value) * 1024)
-#define Megabytes(Value) (Kilobytes(Value) * 1024)
-#define Gigabytes(Value) (Megabytes(Value) * 1024)
-#define Terabytes(Value) (Gigabytes(Value) * 1024)
-
-#ifndef PI
-#define PI  3.14159265359
-#endif
-
-#define TAU 6.2831853071
-#define PI_OVER_180 0.01745329251f
-
-#define GS_TYPES
+#ifndef GS_TYPES_H
+# error "gs_win32_opengl.h relies on gs_types.h. Please include it first."
 #endif
 
 #define GL_SHADING_LANGUAGE_VERSION       0x8B8C
