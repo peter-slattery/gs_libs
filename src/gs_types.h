@@ -5,6 +5,12 @@
 //
 #ifndef GS_TYPES_H
 
+// Someday, we home to remove these includes
+#include "stdarg.h"
+#if !defined(GUESS_INTS)
+# include <stdint.h>
+#endif // !defined(GUESS_INTS)
+
 #define Glue_(a,b) a##b
 #define Glue(a,b) Glue_(a,b)
 
@@ -27,9 +33,7 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
-
 #else
-#include <stdint.h>
 typedef int8_t s8;
 typedef int16_t s16;
 typedef int32_t s32;
@@ -38,7 +42,6 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
-
 #endif
 
 typedef s8 b8;
@@ -47,6 +50,50 @@ typedef s64 b64;
 
 typedef float r32;
 typedef double r64;
+
+enum gs_basic_type
+{
+    gs_BasicType_char,
+    gs_BasicType_b8,
+    gs_BasicType_b32,
+    gs_BasicType_b64,
+    gs_BasicType_u8,
+    gs_BasicType_u16,
+    gs_BasicType_u32,
+    gs_BasicType_u64,
+    gs_BasicType_s8,
+    gs_BasicType_s16,
+    gs_BasicType_s32,
+    gs_BasicType_s64,
+    gs_BasicType_r32,
+    gs_BasicType_r64,
+    
+    gs_BasicType_Count,
+};
+
+global_const u64 gs_BasicTypeSizes[] =
+{
+    sizeof(char),
+    sizeof(b8),
+    sizeof(b32),
+    sizeof(b64),
+    sizeof(u8),
+    sizeof(u16),
+    sizeof(u32),
+    sizeof(u64),
+    sizeof(s8),
+    sizeof(s16),
+    sizeof(s32),
+    sizeof(s64),
+    sizeof(r32),
+    sizeof(r64),
+};
+
+internal u64
+BasicTypeSize(gs_basic_type Type)
+{
+    return gs_BasicTypeSizes[(u32)Type];
+}
 
 global_const u8  MaxU8  = 0xFF;
 global_const u16 MaxU16 = 0xFFFF;
@@ -76,6 +123,9 @@ global_const r64 MaxR64 = 1.79769313486231e+308;
 global_const r64 MinR64 = -MaxR64;
 global_const r64 SmallestPositiveR64 = 4.94065645841247e-324;
 global_const r64 EpsilonR64 = 1.11022302462515650e-16;
+
+// va_start and va_arg replacements
+
 
 internal r32
 DegToRadR32(r32 Degrees)
@@ -168,12 +218,18 @@ struct u64_array
 # define Assert(c) AssertAlways(c)
 # define AssertMessage(m) AssertBreak(m)
 # define InvalidDefaultCase default: { AssertBreak("invalid default case"); } break;
+# define StaticAssert(c) \
+enum { \
+Glue(gs_AssertFail_, __LINE__) = 1 / (int)(!!(c)), \
+}
 #else
 # define Assert(c)
 # define AssertMessage(m)
 # define InvalidDefaultCase default: {} break;
+# define StaticAssert(c)
 #endif
 
+#define AssertImplies(a,b) Statement(if(a) { Assert(b); })
 #define InvalidCodePath AssertMessage("invalid code path")
 #define NotImplemented AssertMessage("not implemented")
 #define DontCompile ImAfraidICantDoThat
@@ -226,10 +282,10 @@ CopyMemory_(u8* From, u8* To, u64 Size)
 #define ZeroArray(arr, type, count) ZeroMemory_((arr), sizeof(type) * (count))
 
 #define CopyArray(from, to, type, count) CopyMemory_((u8*)(from), (u8*)(to), sizeof(type) * (count))
-
+#define CopyMemoryTo(from, to, size) CopyMemory_((u8*)(from), (u8*)(to), (size))
 // Singly Linked List Utilities
 
-#define SLLPush_(list_head,new_ele) new_ele->next = list_head, list_head = new_ele
+#define SLLPush_(list_head,new_ele) new_ele->Next = list_head, list_head = new_ele
 #define SLLPush(list_head,new_ele) (SLLPush_((list_head), (new_ele)))
 
 #define SLLPop_(list_head) list_head=list_head=list_head->next
@@ -483,6 +539,7 @@ CStringLength(char* Str)
     return PointerDifference(At, Str);
 }
 
+#define StringExpand(str) (int)(str).Length, (str).Str
 #define LitString(cstr) gs_const_string{(cstr), CStringLength(cstr) }
 
 // The index of the character in these arrays corresponds to its value as a number in
@@ -605,10 +662,9 @@ struct gs_dynarray_handle
 {
     u64 BufferIndex;
     u64 IndexInBuffer;
-#if !SHIP_MODE
-    gs_dynarray* Array;
-#endif
 };
+
+#define INVALID_DYNARRAY_HANDLE gs_dynarray_handle{0, 0}
 
 struct gs_dynarray_handle_list
 {
@@ -629,17 +685,20 @@ enum enumerate_directory_flag
 
 struct gs_file
 {
-    gs_data FileData;
+    gs_data Data;
     gs_const_string Path;
 };
 
+typedef struct gs_file_handler gs_file_handler;
+
 typedef u64 file_handler_get_file_size(gs_file_handler FileHandler, gs_const_string Path);
-typedef gs_file* file_handler_read_entire_file(gs_file_handler FileHandler, gs_const_string Path, gs_data Memory);
+typedef gs_file file_handler_read_entire_file(gs_file_handler FileHandler, gs_const_string Path, gs_data Memory);
 typedef bool  file_handler_write_entire_file(gs_file_handler FileHandler, gs_const_string Path, gs_data Data);
 typedef gs_const_string_array file_handler_enumerate_directory(gs_file_handler FileHandler, gs_const_string Path, u32 Flags);
 
 struct gs_file_handler
 {
+    file_handler_get_file_size* GetFileSize;
     file_handler_read_entire_file* ReadEntireFile;
     file_handler_write_entire_file* WriteEntireFile;
     file_handler_enumerate_directory* EnumerateDirectory;
@@ -653,6 +712,92 @@ struct gs_file_handler
 struct gs_random_series
 {
     u32 Value;
+};
+
+
+///////////////////////////////
+//
+// Mouse/Keyboard Input
+
+enum gs_event_type
+{
+    // Reached end of event stream
+    gs_EventType_NoMoreEvents,
+    // There was an event but it requires no action from the using program
+    gs_EventType_NoEvent,
+    
+    gs_EventType_KeyPressed,
+    gs_EventType_KeyReleased,
+    
+    gs_EventType_Count,
+};
+
+enum gs_key
+{
+    gs_Key_Invalid,
+    
+    gs_Key_Esc,
+    
+    gs_Key_Space,
+    gs_Key_Tab,
+    gs_Key_CapsLock,
+    gs_Key_LeftShift, gs_Key_RightShift,
+    gs_Key_LeftCtrl, gs_Key_RightCtrl,
+    gs_Key_Fn,
+    gs_Key_Alt,
+    gs_Key_PageUp, gs_Key_PageDown,
+    gs_Key_Backspace, gs_Key_Delete,
+    gs_Key_Enter,
+    
+    // Function Keys
+    gs_Key_F0, gs_Key_F1, gs_Key_F2, gs_Key_F3, gs_Key_F4, gs_Key_F5, gs_Key_F6, gs_Key_F7,
+    gs_Key_F8, gs_Key_F9, gs_Key_F10, gs_Key_F11, gs_Key_F12,
+    
+    // Letters
+    gs_Key_a, gs_Key_b, gs_Key_c, gs_Key_d, gs_Key_e, gs_Key_f, gs_Key_g, gs_Key_h,
+    gs_Key_i, gs_Key_j, gs_Key_k, gs_Key_l, gs_Key_m, gs_Key_n, gs_Key_o, gs_Key_p,
+    gs_Key_q, gs_Key_r, gs_Key_s, gs_Key_t, gs_Key_u, gs_Key_v, gs_Key_w, gs_Key_x,
+    gs_Key_y, gs_Key_z,
+    
+    gs_Key_A, gs_Key_B, gs_Key_C, gs_Key_D, gs_Key_E, gs_Key_F, gs_Key_G, gs_Key_H,
+    gs_Key_I, gs_Key_J, gs_Key_K, gs_Key_L, gs_Key_M, gs_Key_N, gs_Key_O, gs_Key_P,
+    gs_Key_Q, gs_Key_R, gs_Key_S, gs_Key_T, gs_Key_U, gs_Key_V, gs_Key_W, gs_Key_X,
+    gs_Key_Y, gs_Key_Z,
+    
+    // Numbers
+    gs_Key_0, gs_Key_1, gs_Key_2, gs_Key_3, gs_Key_4, gs_Key_5, gs_Key_6, gs_Key_7,
+    gs_Key_8, gs_Key_9,
+    
+    gs_Key_Num0, gs_Key_Num1, gs_Key_Num2, gs_Key_Num3, gs_Key_Num4, gs_Key_Num5,
+    gs_Key_Num6, gs_Key_Num7, gs_Key_Num8, gs_Key_Num9,
+    
+    // Symbols
+    gs_Key_Bang, gs_Key_At, gs_Key_Pound, gs_Key_Dollar, gs_Key_Percent, gs_Key_Carrot,
+    gs_Key_Ampersand, gs_Key_Star, gs_Key_LeftParen, gs_Key_RightParen, gs_Key_Minus, gs_Key_Plus,
+    gs_Key_Equals, gs_Key_Underscore, gs_Key_LeftBrace, gs_Key_RightBrace, gs_Key_LeftBracket,
+    gs_Key_RightBracket, gs_Key_Colon, gs_Key_SemiColon, gs_Key_SingleQuote, gs_Key_DoubleQuote,
+    gs_Key_ForwardSlash, gs_Key_Backslash, gs_Key_Pipe, gs_Key_Comma, gs_Key_Period,
+    gs_Key_QuestionMark, gs_Key_LessThan, gs_Key_GreaterThan, gs_Key_Tilde, gs_Key_BackQuote,
+    
+    // Arrows
+    gs_Key_UpArrow,
+    gs_Key_DownArrow,
+    gs_Key_LeftArrow,
+    gs_Key_RightArrow,
+    
+    // Mouse
+    // NOTE(Peter): Including this here so we can utilize the same KeyDown, KeyUp etc. functions
+    gs_Key_MouseLeftButton,
+    gs_Key_MouseMiddleButton,
+    gs_Key_MouseRightButton,
+    
+    gs_Key_Count,
+};
+
+struct gs_input_event
+{
+    gs_event_type Type;
+    gs_key Key;
 };
 
 #define GS_TYPES_H

@@ -22,7 +22,25 @@ enum gsr_render_type
     gsr_RenderType_SetTexture,
     gsr_RenderType_RenderModel,
     
+    gsr_RenderType_ConsolidateVertexBuffer,
+    
     gsr_RenderType_Count,
+};
+
+gs_const_string RenderEntryTypeStrings[] = {
+    LitString("gsr_RenderType_CreateShader"),
+    LitString("gsr_RenderType_CompileShader"),
+    LitString("gsr_RenderType_CreateModel"),
+    LitString("gsr_RenderType_SetModelData"),
+    LitString("gsr_RenderType_CreateTexture"),
+    LitString("gsr_RenderType_SetTextureData"),
+    LitString("gsr_RenderType_Clear"),
+    LitString("gsr_RenderType_SetShader"),
+    LitString("gsr_RenderType_SetMatrixUniform"),
+    LitString("gsr_RenderType_SetTexture"),
+    LitString("gsr_RenderType_RenderModel"),
+    LitString("gsr_RenderType_ConsolidateVertexBuffer"),
+    LitString("gsr_RenderType_Count"),
 };
 
 struct gsr_compile_shader
@@ -32,34 +50,9 @@ struct gsr_compile_shader
     char* FragmentShader;
 };
 
-enum gsr_vertex_element_type
-{
-    gsr_VertexElement_Int32,
-    gsr_VertexElement_Float32,
-    
-    gsr_VertexElement_Count,
-};
-
-struct gsr_vertex_attribute
-{
-    char* Name;
-    
-    gsr_vertex_element_type ElementType;
-    // This is the number of elements per entry. ie. a v3 is ElementType = Float32, ElementCount = 3
-    u32 ElementCount;
-    
-    s64 Offset;
-    b32 Normalize;
-};
-
 struct gsr_create_model
 {
     gs_dynarray_handle ModelHandle;
-    
-    gsr_vertex_attribute* VertexAttributes;
-    u32 VertexAttributesCount;
-    
-    u32 VertexStride;
 };
 
 struct gsr_set_model_data
@@ -125,11 +118,46 @@ struct gsr_render_model
     gs_dynarray_handle ModelHandle;
 };
 
+struct gsr_draw_circle
+{
+    v2 Center;
+    r32 Radius;
+    v4 Color;
+    
+    b32 Outline;
+    r32 Thickness;
+};
+
+struct gsr_draw_quad
+{
+    v2 Min;
+    v2 Max;
+    v4 Color;
+    
+    b32 Outline;
+    r32 Thickness;
+};
+
+struct gsr_draw_line
+{
+    u32 SegmentsCount;
+    v2* Points;
+    r32 Thickness;
+    v4 Color;
+};
+
+struct gsr_consolidate_vertex_buffer
+{
+    gsr_render_asset_handle Buffer;
+};
+
 struct gsr_render_entry
 {
     gsr_render_type Type;
     union
     {
+        // TODO(Peter): Make these all pointers to the struct,
+        // and just allocate it immediately after the header
         gsr_compile_shader CompileShader;
         gsr_create_model CreateModel;
         gsr_set_model_data SetModelData;
@@ -140,6 +168,12 @@ struct gsr_render_entry
         gsr_set_matrix_uniform SetMatrixUniform;
         gsr_set_texture SetTexture;
         gsr_render_model Model;
+        
+        gsr_draw_circle DrawCircle;
+        gsr_draw_quad DrawQuad;
+        gsr_draw_line DrawLine;
+        
+        gsr_consolidate_vertex_buffer ConsolidateVertexBuffer;
     };
     
     // NOTE(Peter): I'm ok with a linked list here because we will only ever traverse the
@@ -155,6 +189,8 @@ struct gsr_render_queue
     u32 EntriesCount;
     
     gsr_render_asset_list* Assets;
+    
+    gsr_render_asset_handle DefaultVertexBuffer;
 };
 
 //
@@ -186,13 +222,29 @@ gsr_ResetRenderQueue(gsr_render_queue* Queue)
     Queue->EntriesFirst = 0;
     Queue->EntriesLast = 0;
     Queue->EntriesCount = 0;
+    ClearArena(&Queue->Arena);
 }
 
-static gs_dynarray_handle
+static gsr_render_asset_handle
 gsr_CreateShader(gsr_render_queue* Queue)
 {
-    gs_dynarray_handle Result = gsr_TakeAssetHandle(Queue->Assets, gsr_RenderAsset_ShaderProgram);
+    gsr_render_asset_handle Result = gsr_TakeAssetHandle(Queue->Assets, gsr_RenderAsset_ShaderProgram);
     return Result;
+}
+static void
+gsr_CompileShader(gsr_render_queue* Queue, gs_dynarray_handle Shader, char* VertexShader, char* FragmentShader)
+{
+    gsr_render_entry* Entry = gsr_TakeRenderEntry(Queue, gsr_RenderType_CompileShader);
+    Entry->CompileShader.ShaderHandle = Shader;
+    Entry->CompileShader.VertexShader = VertexShader;
+    Entry->CompileShader.FragmentShader = FragmentShader;
+}
+internal gsr_render_asset_handle
+gsr_CreateShader(gsr_render_queue* Queue, char* VertexShader, char* FragmentShader)
+{
+    gsr_render_asset_handle Shader = gsr_CreateShader(Queue);
+    gsr_CompileShader(Queue, Shader, VertexShader, FragmentShader);
+    return Shader;
 }
 
 static u32
@@ -201,16 +253,20 @@ gsr_CalculateAttributeSize(gsr_vertex_attribute Attr)
     u32 Result = 0;
     switch (Attr.ElementType)
     {
-        case gsr_VertexElement_Int32:
+        case gs_BasicType_s32:
         {
             Result = sizeof(s32);
         }break;
         
-        case gsr_VertexElement_Float32:
+        case gs_BasicType_r32:
         {
             Result = sizeof(r32);
         }break;
         
+        case gs_BasicType_u32:
+        {
+            Result = sizeof(u32);
+        }break;
         InvalidDefaultCase;
     }
     
@@ -218,13 +274,15 @@ gsr_CalculateAttributeSize(gsr_vertex_attribute Attr)
     return Result;
 }
 
-static gs_dynarray_handle
+static gsr_render_asset_handle
 gsr_CreateModel(gsr_render_queue* Queue, gsr_vertex_attribute* VertexAttributes, u32 VertexStride = 0)
 {
-    gs_dynarray_handle Result = gsr_TakeAssetHandle(Queue->Assets, gsr_RenderAsset_Model);
-    
+    gsr_render_asset_handle Result = gsr_TakeAssetHandle(Queue->Assets, gsr_RenderAsset_Model);
     gsr_render_entry* Entry = gsr_TakeRenderEntry(Queue, gsr_RenderType_CreateModel);
     Entry->CreateModel.ModelHandle = Result;
+    
+    gsr_render_asset* Asset = gsr_GetAsset(Queue->Assets, Result);
+    Assert(Asset->Type == gsr_RenderAsset_Model);
     
     // Count Vertex Attributes
     u32 DefaultVertexStride = 0;
@@ -233,22 +291,13 @@ gsr_CreateModel(gsr_render_queue* Queue, gsr_vertex_attribute* VertexAttributes,
     while (AttrAt && AttrAt->Name != 0)
     {
         Assert(AttrAt->Name != 0);
-        DefaultVertexStride += gsr_CalculateAttributeSize(*AttrAt);
         AttrCount++;
         AttrAt++;
     }
     
-    if (VertexStride == 0)
-    {
-        Entry->CreateModel.VertexStride = DefaultVertexStride;
-    }
-    else
-    {
-        Entry->CreateModel.VertexStride = VertexStride;
-    }
-    
-    Entry->CreateModel.VertexAttributesCount = AttrCount;
-    Entry->CreateModel.VertexAttributes = PushArray(&Queue->Arena, gsr_vertex_attribute, AttrCount);
+    Asset->Model.VertexAttributesCount = AttrCount;
+    Asset->Model.VertexAttributes = PushArray(&Queue->Assets->Arena, gsr_vertex_attribute, AttrCount);
+    CopyArray(&VertexAttributes[0], Asset->Model.VertexAttributes, gsr_vertex_attribute, AttrCount);
     
     // NOTE(Peter): ATTRIBUTE OFFSETS
     // Use this attr's offset to get the offset for the next attribute,
@@ -262,13 +311,12 @@ gsr_CreateModel(gsr_render_queue* Queue, gsr_vertex_attribute* VertexAttributes,
     // attributes are tightly packed. If you interleave, we defer when you
     // specify an offset, and assume tight packing when you dont.
     u32 AttrOffset = 0;
-    for (u32 i = 0; i < Entry->CreateModel.VertexAttributesCount; i++)
+    for (u32 i = 0; i < Asset->Model.VertexAttributesCount; i++)
     {
         gsr_vertex_attribute SrcAttr = VertexAttributes[i];
         Assert(SrcAttr.Name != 0);
         
-        gsr_vertex_attribute* DestAttr = Entry->CreateModel.VertexAttributes + i;
-        *DestAttr = SrcAttr;
+        gsr_vertex_attribute* DestAttr = Asset->Model.VertexAttributes + i;
         
         u32 AttrSize = gsr_CalculateAttributeSize(*DestAttr);
         if (DestAttr->Offset == 0)
@@ -282,6 +330,15 @@ gsr_CreateModel(gsr_render_queue* Queue, gsr_vertex_attribute* VertexAttributes,
         }
     }
     
+    if (VertexStride == 0)
+    {
+        Asset->Model.VertexStride = gsr_CalculateVertexAttributesStride(Asset->Model.VertexAttributes, AttrCount);
+    }
+    else
+    {
+        Asset->Model.VertexStride = VertexStride;
+    }
+    
     return Result;
 }
 
@@ -290,15 +347,6 @@ gsr_CreateTexture(gsr_render_queue* Queue)
 {
     gs_dynarray_handle Result = gsr_TakeAssetHandle(Queue->Assets, gsr_RenderAsset_Texture);
     return Result;
-}
-
-static void
-gsr_CompileShader(gsr_render_queue* Queue, gs_dynarray_handle Shader, char* VertexShader, char* FragmentShader)
-{
-    gsr_render_entry* Entry = gsr_TakeRenderEntry(Queue, gsr_RenderType_CompileShader);
-    Entry->CompileShader.ShaderHandle = Shader;
-    Entry->CompileShader.VertexShader = VertexShader;
-    Entry->CompileShader.FragmentShader = FragmentShader;
 }
 
 static void
@@ -401,6 +449,35 @@ gsr_RenderModel(gsr_render_queue* Queue, gs_dynarray_handle ModelHandle)
     gsr_AssertAssetTypeEquals(*Queue->Assets, ModelHandle, gsr_RenderAsset_Model);
     gsr_render_entry* Entry = gsr_TakeRenderEntry(Queue, gsr_RenderType_RenderModel);
     Entry->Model.ModelHandle = ModelHandle;
+}
+
+internal gsr_render_asset_handle
+gsr_TakeVertexBuffer(gsr_render_queue* Queue, gsr_vertex_attribute* VertexAttributes)
+{
+    gsr_render_asset_handle Result = gsr_TakeVertexBuffer(Queue->Assets);
+    gsr_render_asset_handle Model = gsr_CreateModel(Queue, VertexAttributes);
+    gsr_SetVertexBufferModel(Queue->Assets, Result, Model);
+    return Result;
+}
+internal gsr_render_asset_handle
+gsr_TakeVertexBuffer(gsr_render_queue* Queue)
+{
+    return gsr_TakeVertexBuffer(Queue, gsr_StandardVertexAttributes);
+}
+internal void
+gsr_RenderVertexBuffer(gsr_render_queue* Queue, gsr_render_asset_handle BufferHandle)
+{
+    gsr_render_entry* ConsolidateEntry = gsr_TakeRenderEntry(Queue, gsr_RenderType_ConsolidateVertexBuffer);
+    ConsolidateEntry->ConsolidateVertexBuffer.Buffer = BufferHandle;
+    
+    gsr_vertex_buffer* Buffer = gsr_GetAssetDataOfType(Queue->Assets, BufferHandle, gsr_vertex_buffer);
+    gsr_RenderModel(Queue, Buffer->ModelHandle);
+}
+internal void
+gsr_ResetVertexBuffer(gsr_render_queue* Queue, gsr_render_asset_handle BufferHandle)
+{
+    gsr_vertex_buffer* Buffer = gsr_GetAssetDataOfType(Queue->Assets, BufferHandle, gsr_vertex_buffer);
+    gsr_ResetVertexBuffer(Buffer);
 }
 
 #if 0

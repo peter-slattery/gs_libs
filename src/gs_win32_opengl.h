@@ -70,6 +70,7 @@ typedef void gl_get_program_iv(GLuint program, GLenum pname, GLint *params);
 typedef void gl_get_program_info_log(GLuint program, GLsizei maxLength, GLsizei *length, char *infoLog);
 typedef void gl_use_program(GLuint program);
 typedef void gl_vertex_attrib_pointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer);
+typedef void gl_vertex_attrib_ipointer(GLuint index, GLint size, GLenum type, GLsizei stride, const void * pointer);
 typedef void gl_enable_vertex_attrib_array(GLuint index);
 typedef void gl_disable_vertex_attrib_array(GLuint index);
 typedef void gl_gen_vertex_arrays(GLsizei n, GLuint *arrays);
@@ -127,6 +128,7 @@ struct gswo_procs
     gl_get_program_info_log* glGetProgramInfoLog;
     gl_use_program* glUseProgram;
     gl_vertex_attrib_pointer* glVertexAttribPointer;
+    gl_vertex_attrib_ipointer* glVertexAttribIPointer;
     gl_enable_vertex_attrib_array* glEnableVertexAttribArray;
     gl_disable_vertex_attrib_array* glDisableVertexAttribArray;
     gl_gen_vertex_arrays* glGenVertexArrays;
@@ -173,10 +175,6 @@ struct gswo_model
     u32 VertexBuffer;
     u32 IndexBuffer;
     u32 IndexCount;
-    
-    u32 VertexStride;
-    gsr_vertex_attribute* VertexAttributes;
-    u32 VertexAttributesCount;
 };
 
 struct gswo_texture
@@ -185,71 +183,86 @@ struct gswo_texture
 };
 
 //
-// Model
+// Fixed Function Pipeline
 //
 
-static u8*
-gswo_CreateModel(gswo_procs OpenGL, gs_memory_arena* Arena, gsr_create_model CreateModel)
-{
-    gswo_model* Result = PushStruct(Arena, gswo_model);
-    OpenGL.glGenVertexArrays(1, &Result->VertexArray);
-    OpenGL.glGenBuffers(1, &Result->VertexBuffer);
-    OpenGL.glGenBuffers(1, &Result->IndexBuffer);
-    
-    Result->VertexStride = CreateModel.VertexStride;
-    Result->VertexAttributesCount = CreateModel.VertexAttributesCount;
-    Result->VertexAttributes = PushArray(Arena, gsr_vertex_attribute, Result->VertexAttributesCount);
-    CopyArray(CreateModel.VertexAttributes, Result->VertexAttributes, gsr_vertex_attribute, Result->VertexAttributesCount);
-    
-    return (u8*)Result;
-}
+// TODO(Peter): I want some way of knowing that OpenGL version being used is below 3.2
+// because OpenGL just fails silently if you use fixed-function calls on > 3.1
 
-static void
-gswo_SetBufferData(int Buffer, int BufferType, int Size, u8* Data, int DrawType, gswo_procs OpenGL)
-{
-    OpenGL.glBindBuffer(BufferType, Buffer);
-    OpenGL.glBufferData(BufferType, Size, Data, DrawType);
-}
+
+//
+// Model
+//
 
 static void
 gswo_SetEnableVertexAttribute(gswo_procs OpenGL, u32 VertexStride, u32 AttrIndex, gsr_vertex_attribute Attr)
 {
-    GLenum ElementType = 0;
     switch (Attr.ElementType)
     {
-        case gsr_VertexElement_Int32: { ElementType = GL_INT; } break;
-        case gsr_VertexElement_Float32: { ElementType = GL_FLOAT; } break;
+        case gs_BasicType_r32:
+        {
+            b32 Normalize = Attr.Normalize ? GL_TRUE : GL_FALSE;
+            OpenGL.glVertexAttribPointer(AttrIndex, Attr.ElementCount, GL_FLOAT, Normalize, VertexStride, (void*)Attr.Offset);
+        }break;
+        
+        case gs_BasicType_s32:
+        {
+            OpenGL.glVertexAttribIPointer(AttrIndex, Attr.ElementCount, GL_INT, VertexStride, (void*)Attr.Offset);
+        }break;
+        
+        case gs_BasicType_u32:
+        {
+            OpenGL.glVertexAttribIPointer(AttrIndex, Attr.ElementCount, GL_UNSIGNED_INT, VertexStride, (void*)Attr.Offset);
+        }break;
+        
+        // for doubles, if you ever need them, see glVertexAttribLPointer here:
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glVertexAttribPointer.xhtml
+        InvalidDefaultCase;
     }
-    
-    b32 Normalize = Attr.Normalize ? GL_TRUE : GL_FALSE;
-    
-    OpenGL.glVertexAttribPointer(AttrIndex, Attr.ElementCount, ElementType, Normalize, VertexStride, (void*)Attr.Offset);
     OpenGL.glEnableVertexAttribArray(AttrIndex);
 }
-
 static void
 gswo_BindModel(gswo_procs OpenGL, gswo_model Model)
 {
     OpenGL.glBindVertexArray(Model.VertexArray);
 }
-
+static u8*
+gswo_CreateModel(gswo_procs OpenGL, gs_memory_arena* Arena, gsr_model RendererModel)
+{
+    gswo_model* Model = PushStruct(Arena, gswo_model);
+    OpenGL.glGenVertexArrays(1, &Model->VertexArray);
+    OpenGL.glGenBuffers(1, &Model->VertexBuffer);
+    OpenGL.glGenBuffers(1, &Model->IndexBuffer);
+    return (u8*)Model;
+}
+static void
+gswo_SetBufferData(gswo_procs OpenGL, int Buffer, int BufferType, int Size, u8* Data, int DrawType)
+{
+    OpenGL.glBindBuffer(BufferType, Buffer);
+    OpenGL.glBufferData(BufferType, Size, Data, DrawType);
+}
 static void
 gswo_SetModelData(gswo_procs OpenGL, gsr_render_asset* ModelAsset, gsr_set_model_data ModelData)
 {
+    gsr_model RendererModel = ModelAsset->Model;
     gswo_model* Model = (gswo_model*)ModelAsset->BackendAssetData;
     
     gswo_BindModel(OpenGL, *Model);
-    
-    gswo_SetBufferData(Model->VertexBuffer, GL_ARRAY_BUFFER, ModelData.VertexBufferSize, ModelData.VertexBuffer, GL_STATIC_DRAW, OpenGL);
-    gswo_SetBufferData(Model->IndexBuffer, GL_ELEMENT_ARRAY_BUFFER, ModelData.IndexBufferSize, ModelData.IndexBuffer, GL_STATIC_DRAW, OpenGL);
-    
-    for (u32 Attr = 0; Attr < Model->VertexAttributesCount; Attr++)
+    for (u32 i = 0; i < RendererModel.VertexAttributesCount; i++)
     {
-        gsr_vertex_attribute AttrAt = Model->VertexAttributes[Attr];
-        gswo_SetEnableVertexAttribute(OpenGL, Model->VertexStride, Attr, AttrAt);
+        gswo_SetEnableVertexAttribute(OpenGL, RendererModel.VertexStride, i, RendererModel.VertexAttributes[i]);
     }
     
+    gswo_BindModel(OpenGL, *Model);
+    gswo_SetBufferData(OpenGL, Model->VertexBuffer, GL_ARRAY_BUFFER, ModelData.VertexBufferSize, ModelData.VertexBuffer, GL_STATIC_DRAW);
+    gswo_SetBufferData(OpenGL, Model->IndexBuffer, GL_ELEMENT_ARRAY_BUFFER, ModelData.IndexBufferSize, ModelData.IndexBuffer, GL_STATIC_DRAW);
+    
     Model->IndexCount = ModelData.IndexBufferSize / sizeof(u32);
+}
+static void
+gswo_DrawModel(gswo_procs OpenGL, gswo_model Model)
+{
+    glDrawElements(GL_TRIANGLES, Model.IndexCount, GL_UNSIGNED_INT, 0);
 }
 
 static void
@@ -258,17 +271,10 @@ gswo_SetMatrix44(gswo_procs OpenGL, u32 MatrixLocation, r32* Matrix, b32 Transpo
     GLboolean glTranspose = Transpose ? GL_TRUE : GL_FALSE;
     OpenGL.glUniformMatrix4fv(MatrixLocation, 1, glTranspose, Matrix);
 }
-
 static void
 gswo_SetFloat(gswo_procs OpenGL, u32 FloatLocation, r32 Value)
 {
     OpenGL.glUniform1fv(FloatLocation, 1, &Value);
-}
-
-static void
-gswo_DrawModel(gswo_procs OpenGL, gswo_model Model)
-{
-    glDrawElements(GL_TRIANGLES, Model.IndexCount, GL_UNSIGNED_INT, 0);
 }
 
 //
@@ -285,18 +291,23 @@ gswo_SetTextureParameters(u32 Repeat, u32 MinFilter, u32 MagFilter)
 }
 
 static void
-gswo_SetTextureData(gsr_render_asset* Asset, gsr_set_texture_data TextureData)
+gswo_SetTextureData(gsr_render_asset* Asset, u8* TextureData, u32 Width, u32 Height, u32 Channels)
 {
     gswo_texture* Texture = (gswo_texture*)Asset->BackendAssetData;
     
     u32 PixelFormat = GL_RGB;
-    if (TextureData.Channels == 4)
+    if (Channels == 4)
     {
         PixelFormat = GL_RGBA;
     }
     
     glBindTexture(GL_TEXTURE_2D, Texture->Handle);
-    glTexImage2D(GL_TEXTURE_2D, 0, PixelFormat, TextureData.Width, TextureData.Height, 0, PixelFormat, GL_UNSIGNED_BYTE, TextureData.Data);
+    glTexImage2D(GL_TEXTURE_2D, 0, PixelFormat, Width, Height, 0, PixelFormat, GL_UNSIGNED_BYTE, TextureData);
+}
+static void
+gswo_SetTextureData(gsr_render_asset* Asset, gsr_set_texture_data TextureData)
+{
+    gswo_SetTextureData(Asset, TextureData.Data, TextureData.Width, TextureData.Height, TextureData.Channels);
 }
 
 static u8*
@@ -325,7 +336,7 @@ gswo_CreateDepthStencilTexture(u32 Width, u32 Height, gs_memory_arena* Arena)
 //
 
 static u32
-gswo_CompileShader(char* Source, u32 ShaderType, gswo_procs OpenGL, char* ErrorLog = 0, s32 MaxErrorLogLength = 0)
+gswo_CompileShader(char* Source, u32 ShaderType, gswo_procs OpenGL, gs_string* ErrorLog)
 {
     u32 Result = OpenGL.glCreateShader(ShaderType);
     OpenGL.glShaderSource(Result, 1, (const char**)&Source, NULL);
@@ -334,11 +345,9 @@ gswo_CompileShader(char* Source, u32 ShaderType, gswo_procs OpenGL, char* ErrorL
     OpenGL.glGetShaderiv(Result, GL_COMPILE_STATUS, &Success);
     if (!Success)
     {
-        char TempErrorLog[256];
-        OpenGL.glGetShaderInfoLog(Result, 256, NULL, TempErrorLog);
-        if (MaxErrorLogLength > 0)
+        if (ErrorLog && ErrorLog->Size > 0)
         {
-            // TODO(Peter): Copy error log
+            OpenGL.glGetShaderInfoLog(Result, ErrorLog->Size, (GLsizei*)&ErrorLog->Length, ErrorLog->Str);
         }
         OpenGL.glDeleteShader(Result);
         Result = 0;
@@ -347,21 +356,20 @@ gswo_CompileShader(char* Source, u32 ShaderType, gswo_procs OpenGL, char* ErrorL
 }
 
 static u32
-gswo_LinkProgram(u32 VertexShader, u32 FragmentShader, gswo_procs OpenGL, char* ErrorLog = 0, s32 MaxErrorLogLength = 0)
+gswo_LinkProgram(u32 VertexShader, u32 FragmentShader, gswo_procs OpenGL, gs_string* ErrorLog)
 {
     u32 Result = OpenGL.glCreateProgram();
     OpenGL.glAttachShader(Result, VertexShader);
     OpenGL.glAttachShader(Result, FragmentShader);
     OpenGL.glLinkProgram(Result);
+    
     s32 Success = 0;
     OpenGL.glGetProgramiv(Result, GL_LINK_STATUS, &Success);
     if (!Success)
     {
-        char TempErrorLog[256];
-        OpenGL.glGetProgramInfoLog(Result, 256, NULL, TempErrorLog);
-        if (MaxErrorLogLength > 0)
+        if (ErrorLog && ErrorLog->Size > 0)
         {
-            // TODO(Peter): Copy the error log
+            OpenGL.glGetProgramInfoLog(Result, ErrorLog->Size, (GLsizei*)&ErrorLog->Length, ErrorLog->Str);
         }
         OpenGL.glDeleteProgram(Result);
         Result = 0;
@@ -370,21 +378,27 @@ gswo_LinkProgram(u32 VertexShader, u32 FragmentShader, gswo_procs OpenGL, char* 
 }
 
 static void
-gswo_CompileAndLinkProgram(gswo_procs OpenGL, gsr_render_asset* ShaderAsset, gsr_compile_shader ShaderCode,
-                           char* ErrorLog = 0, s32 ErrorLogSize = 0)
+gswo_CompileAndLinkProgram(gswo_procs OpenGL, gsr_render_asset* ShaderAsset, char* VertexShader, char* FragmentShader,
+                           gs_string* ErrorLog)
 {
     gswo_shader_program* ShaderProgram = (gswo_shader_program*)ShaderAsset->BackendAssetData;
     
-    u32 VertexShader = gswo_CompileShader(ShaderCode.VertexShader, GL_VERTEX_SHADER, OpenGL, ErrorLog, ErrorLogSize);
-    Assert(VertexShader);
+    u32 VertexShaderID = gswo_CompileShader(VertexShader, GL_VERTEX_SHADER, OpenGL, ErrorLog);
+    Assert(VertexShaderID);
     
-    u32 FragmentShader = gswo_CompileShader(ShaderCode.FragmentShader, GL_FRAGMENT_SHADER, OpenGL, ErrorLog, ErrorLogSize);
-    Assert(FragmentShader);
+    u32 FragmentShaderID = gswo_CompileShader(FragmentShader, GL_FRAGMENT_SHADER, OpenGL, ErrorLog);
+    Assert(FragmentShaderID);
     
-    ShaderProgram->ShaderProgram = gswo_LinkProgram(VertexShader, FragmentShader, OpenGL, ErrorLog, ErrorLogSize);
+    ShaderProgram->ShaderProgram = gswo_LinkProgram(VertexShaderID, FragmentShaderID, OpenGL, ErrorLog);
+    Assert(ShaderProgram->ShaderProgram);
     
-    OpenGL.glDeleteShader(VertexShader);
-    OpenGL.glDeleteShader(FragmentShader);
+    OpenGL.glDeleteShader(VertexShaderID);
+    OpenGL.glDeleteShader(FragmentShaderID);
+}
+static void
+gswo_CompileAndLinkProgram(gswo_procs OpenGL, gsr_render_asset* ShaderAsset, gsr_compile_shader ShaderCode, gs_string* ErrorLog)
+{
+    gswo_CompileAndLinkProgram(OpenGL, ShaderAsset, ShaderCode.VertexShader, ShaderCode.FragmentShader, ErrorLog);
 }
 
 static u8*
@@ -482,6 +496,41 @@ gswo_RenderModel(gsr_render_asset* Asset)
 {
     gswo_model* Model = (gswo_model*)Asset->BackendAssetData;
     glDrawElements(GL_TRIANGLES, Model->IndexCount, GL_UNSIGNED_INT, 0);
+}
+
+//
+// Immediate Mode
+//
+
+internal void
+gswo_ImmediateDrawTri(v3 V0, v3 V1, v3 V2, v2 UV0, v2 UV1, v2 UV2, v4 Color)
+{
+    glBegin(GL_TRIANGLES);
+    
+    glColor4fv(Color.E);
+    
+    glTexCoord2fv(UV0.E);
+    glVertex3fv(V0.E);
+    
+    glTexCoord2fv(UV1.E);
+    glVertex3fv(V1.E);
+    
+    glTexCoord2fv(UV2.E);
+    glVertex3fv(V2.E);
+    
+    glEnd();
+}
+
+internal void
+gswo_ImmediateDrawQuad(v3 V0, v3 V1, v3 V2, v3 V3, v2 UV0, v2 UV1, v2 UV2, v2 UV3, v4 Color)
+{
+    gswo_ImmediateDrawTri(V0, V1, V2, UV0, UV1, UV2, Color);
+    gswo_ImmediateDrawTri(V0, V2, V3, UV0, UV2, UV3, Color);
+}
+internal void
+gswo_ImmediateDrawQuad(v3 V0, v3 V1, v3 V2, v3 V3, v4 Color)
+{
+    gswo_ImmediateDrawQuad(V0, V1, V2, V3, v2{0,0}, v2{1,0}, v2{1,1}, v2{0,1}, Color);
 }
 
 //
@@ -730,6 +779,7 @@ gswo_GetProcAddresses(gswo_procs* Procs)
     GetOpenGLProcAddress(Procs, gl_get_program_info_log, glGetProgramInfoLog);
     GetOpenGLProcAddress(Procs, gl_use_program, glUseProgram);
     GetOpenGLProcAddress(Procs, gl_vertex_attrib_pointer, glVertexAttribPointer);
+    GetOpenGLProcAddress(Procs, gl_vertex_attrib_ipointer, glVertexAttribIPointer);
     GetOpenGLProcAddress(Procs, gl_enable_vertex_attrib_array, glEnableVertexAttribArray);
     GetOpenGLProcAddress(Procs, gl_disable_vertex_attrib_array, glDisableVertexAttribArray);
     GetOpenGLProcAddress(Procs, gl_gen_vertex_arrays, glGenVertexArrays);
@@ -769,7 +819,7 @@ gswo_Init(HDC DeviceContext, int ColorBits, int AlphaBits, int DepthBits, gswo_p
     gswo_LoadWGLProcsForPixelFormat(Procs);
     
     s32 MajorVersionMin = 3;
-    s32 MinorVersionMin = 3;
+    s32 MinorVersionMin = 2;
     int ContextAttributesList[] = {
         WGL_CONTEXT_MAJOR_VERSION_ARB, MajorVersionMin,
         WGL_CONTEXT_MINOR_VERSION_ARB, MinorVersionMin,

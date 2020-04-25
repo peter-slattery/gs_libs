@@ -26,9 +26,10 @@
 #ifdef GS_MEMORY_CSTDLIB
 
 static void*
-gs_Alloc(u64 Size)
+gs_Alloc(u64 Size, u64* SizeResult)
 {
     void* Result = malloc(Size);
+    *SizeResult = Size;
     return Result;
 }
 
@@ -43,9 +44,10 @@ gs_Free(void* Ptr, int Size)
 #if defined(GS_MEMORY_WIN32) || defined(GS_PLATFORM_WIN32)
 
 static void*
-gs_Alloc(u64 Size)
+gs_Alloc(u64 Size, u64* SizeResult)
 {
     void* Result = (void*)VirtualAlloc(NULL, Size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    *SizeResult = Size;
     return Result;
 }
 
@@ -66,13 +68,14 @@ gs_Free(void* Base, u64 Size)
 #if defined(GS_MEMORY_OSX) || defined(GS_PLATFORM_OSX)
 
 static void*
-gs_Alloc(u64 Size)
+gs_Alloc(u64 Size, u64* SizeResult)
 {
 	void* Result = 0;
 	char* StartAddress = (char*)0;
 	int Prot = PROT_READ | PROT_WRITE;
 	int Flags = MAP_PRIVATE | MAP_ANON;
 	Result = (void*)mmap(StartAddress, Size, Prot, Flags, -1, 0);
+    *SizeResult = Size;
 	return Result;
 }
 
@@ -84,6 +87,11 @@ gs_Free(unsigned char* Base, u64 Size)
 
 #endif
 
-
+internal gs_allocator
+CreateStandardPlatformAllocator()
+{
+    gs_allocator Result = CreateAllocator(gs_Alloc, gs_Free);
+    return Result;
+}
 #define GS_MEMORY_H
 #endif // GS_MEMORY_H

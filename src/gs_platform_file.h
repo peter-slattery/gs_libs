@@ -90,8 +90,7 @@ gs_GetFileSize(gs_file_handler FileHandler, gs_const_string Path)
 static gs_file
 gs_ReadEntireFileAndNullTerminate (gs_file_handler FileHandler, gs_const_string Path, gs_data Memory)
 {
-    Assert(Memory.Memory != 0);
-    Assert(Memory.Length > 0);
+    Assert(DataIsNonEmpty(Memory));
     Assert(IsNullTerminated(Path));
     
     gs_file Result = {0};
@@ -101,10 +100,10 @@ gs_ReadEntireFileAndNullTerminate (gs_file_handler FileHandler, gs_const_string 
     if (FileHandle != INVALID_HANDLE_VALUE)
     {
         DWORD BytesRead = 0;
-        if (ReadFile(FileHandle, (LPVOID)Memory.Memory, Memory.Length - 1, (LPDWORD)(&BytesRead), NULL))
+        if (ReadFile(FileHandle, (LPVOID)Memory.Memory, Memory.Size - 1, (LPDWORD)(&BytesRead), NULL))
         {
-            Memory.Memory[Memory.Length - 1] = 0;
-            Assert((BytesRead + 1) == FileLength);
+            Memory.Memory[Memory.Size - 1] = 0;
+            Result.Data = Memory;
         }
         else
         {
@@ -119,14 +118,13 @@ gs_ReadEntireFileAndNullTerminate (gs_file_handler FileHandler, gs_const_string 
         CloseHandle(FileHandle);
     }
     
-    return Success;
+    return Result;
 }
 
 static bool
 gs_WriteEntireFile(gs_file_handler FileHandler, gs_const_string Path, gs_data Memory)
 {
-    Assert(Memory.Memory != 0);
-    Assert(Memory.Length > 0);
+    Assert(DataIsNonEmpty(Memory));
     Assert(IsNullTerminated(Path));
     
     bool Success = false;
@@ -134,9 +132,9 @@ gs_WriteEntireFile(gs_file_handler FileHandler, gs_const_string Path, gs_data Me
     if (FileHandle  != INVALID_HANDLE_VALUE)
     {
         DWORD BytesWritten = 0;
-        if (WriteFile(FileHandle, Memory.Memory, Memory.Length, &BytesWritten, NULL))
+        if (WriteFile(FileHandle, Memory.Memory, Memory.Size, &BytesWritten, NULL))
         {
-            Success = (BytesWritten == FileLength);
+            Success = (BytesWritten == Memory.Size);
         }
         else
         {
@@ -173,8 +171,7 @@ gs_GetFileSize(gs_file_handler FileHandler, gs_const_string Path)
 static gs_file
 gs_ReadEntireFileAndNullTerminate (gs_file_handler FileHandler, gs_const_string Path, gs_data Memory)
 {
-    Assert(Memory.Memory != 0);
-    Assert(Memory.Length > 0);
+    Assert(DataIsNonEmpty(Memory));
 	Assert(IsNullTerminated(Path));
 	int FileHandle = open(Path.Str, O_RDONLY);
     if (FileHandle)
@@ -183,8 +180,8 @@ gs_ReadEntireFileAndNullTerminate (gs_file_handler FileHandler, gs_const_string 
         fstat(FileHandle, &FileStat);
         if (FileStat.st_size <= FileSize)
         {
-            read(FileHandle, Memory.Memory, Memory.Length - 1);
-            Memory.Memory[Memory.Length - 1] = 0;
+            read(FileHandle, Memory.Memory, Memory.Size - 1);
+            Memory.Memory[Memory.Size - 1] = 0;
             Result = true;
         }
         else
@@ -200,16 +197,15 @@ gs_ReadEntireFileAndNullTerminate (gs_file_handler FileHandler, gs_const_string 
 static bool
 gs_WriteEntireFile(gs_file_handler FileHandler, gs_const_string Path, gs_data Memory)
 {
-	Assert(Memory.Memory != 0);
-    Assert(Memory.Length > 0);
+	Assert(DataIsNonEmpty(Memory));
 	Assert(IsNullTerminated(Path));
     bool Result = false;
 	
     int FileHandle = open(Path.Str, O_WRONLY | O_CREAT, 0777);
 	if (FileHandle)
     {
-        ssize_t SizeWritten = write(FileHandle, Memory.Memory, Memory.Length);
-        Result = ((bool)SizeWritten == Memory.Length);
+        ssize_t SizeWritten = write(FileHandle, Memory.Memory, Memory.Size);
+        Result = ((bool)SizeWritten == Memory.Size);
         if (!Result)
         {
             // :ErrorReporting
@@ -220,6 +216,18 @@ gs_WriteEntireFile(gs_file_handler FileHandler, gs_const_string Path, gs_data Me
 }
 
 #endif
+
+// NOTE(Peter): Not platform specific since all procedures have same names and same signatures
+static gs_file_handler
+gs_CreatePlatformFileHandler(gs_allocator* Allocator)
+{
+    gs_file_handler Result = CreateFileHandler(gs_GetFileSize,
+                                               gs_ReadEntireFileAndNullTerminate,
+                                               gs_WriteEntireFile,
+                                               0, // Enumerate Directory
+                                               Allocator);
+    return Result;
+}
 
 #define GS_FILE_H
 #endif // GS_FILE_H

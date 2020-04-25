@@ -593,13 +593,13 @@ gso_CompressObj(gso_expanded_obj ExpandedObj, gso_compressed_obj* CompObj)
 }
 
 static gso_compressed_obj
-gso_CreateObj(u8* FileData, u32 FileSize)
+gso_CreateObj(gs_data Memory)
 {
     gso_compressed_obj Result = {0};
     
-    gso_expanded_obj CubeObj = gso_PreprocessObjFile(FileData, FileSize);
+    gso_expanded_obj CubeObj = gso_PreprocessObjFile(Memory.Memory, Memory.Size);
     CubeObj.BufferBase = (u8*)malloc(CubeObj.BufferSize);
-    gso_ParseObj(FileData, FileSize, &CubeObj);
+    gso_ParseObj(Memory.Memory, Memory.Size, &CubeObj);
     
     Result = gso_PrepareCompressedObj(CubeObj);
     Result.Verteces = (gso_vertex*)malloc(Result.VertexBufferSize);

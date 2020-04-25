@@ -9,7 +9,7 @@ internal u64
 RoundUpTo64(u64 Value, u64 Alignment)
 {
     Value += Alignment - 1;
-    Value = Value % Alignment;
+    Value -= Value % Alignment;
     return Value;
 }
 
@@ -337,13 +337,13 @@ v2 operator- (v2 A, v2 B) { return { A.X - B.X, A.Y - B.Y }; }
 v3 operator- (v3 A, v3 B) { return { A.X - B.X, A.Y - B.Y, A.Z - B.Z }; }
 v4 operator- (v4 A, v4 B) { return { A.X - B.X, A.Y - B.Y, A.Z - B.Z, A.W - B.W }; }
 
-v2 operator+= (v2& A, v2 B) { return { A.X + B.X, A.Y + B.Y }; }
-v3 operator+= (v3& A, v3 B) { return { A.X + B.X, A.Y + B.Y, A.Z + B.Z }; }
-v4 operator+= (v4& A, v4 B) { return { A.X + B.X, A.Y + B.Y, A.Z + B.Z, A.W + B.W }; }
+void operator+= (v2& A, v2 B) { A.X += B.X; A.Y += B.Y; }
+void operator+= (v3& A, v3 B) { A.X += B.X; A.Y += B.Y; A.Z += B.Z; }
+void operator+= (v4& A, v4 B) { A.X += B.X; A.Y += B.Y; A.Z += B.Z; A.W += B.W; }
 
-v2 operator-= (v2& A, v2 B) { return { A.X - B.X, A.Y - B.Y }; }
-v3 operator-= (v3& A, v3 B) { return { A.X - B.X, A.Y - B.Y, A.Z - B.Z }; }
-v4 operator-= (v4& A, v4 B) { return { A.X - B.X, A.Y - B.Y, A.Z - B.Z, A.W - B.W }; }
+void operator-= (v2& A, v2 B) { A.X -= B.X; A.Y -= B.Y; }
+void operator-= (v3& A, v3 B) { A.X -= B.X; A.Y -= B.Y; A.Z -= B.Z; }
+void operator-= (v4& A, v4 B) { A.X -= B.X; A.Y -= B.Y; A.Z -= B.Z; A.W -= B.W; }
 
 v2 operator* (v2 A, r32 B) { return { A.X * B, A.Y * B }; }
 v3 operator* (v3 A, r32 B) { return { A.X * B, A.Y * B, A.Z * B }; }
@@ -353,13 +353,13 @@ v2 operator/ (v2 A, r32 B) { return { A.X / B, A.Y / B }; }
 v3 operator/ (v3 A, r32 B) { return { A.X / B, A.Y / B, A.Z / B }; }
 v4 operator/ (v4 A, r32 B) { return { A.X / B, A.Y / B, A.Z / B, A.W / B }; }
 
-v2 operator*= (v2& A, r32 B) { return { A.X * B, A.Y * B }; }
-v3 operator*= (v3& A, r32 B) { return { A.X * B, A.Y * B, A.Z * B }; }
-v4 operator*= (v4& A, r32 B) { return { A.X * B, A.Y * B, A.Z * B, A.W * B }; }
+void operator*= (v2& A, r32 B) { A.X *= B; A.Y *= B; }
+void operator*= (v3& A, r32 B) { A.X *= B; A.Y *= B; A.Z *= B; }
+void operator*= (v4& A, r32 B) { A.X *= B; A.Y *= B; A.Z *= B; A.W *= B; }
 
-v2 operator/= (v2& A, r32 B) { return { A.X / B, A.Y / B }; }
-v3 operator/= (v3& A, r32 B) { return { A.X / B, A.Y / B, A.Z / B }; }
-v4 operator/= (v4& A, r32 B) { return { A.X / B, A.Y / B, A.Z / B, A.W / B }; }
+void operator/= (v2& A, r32 B) { A.X /= B; A.Y /= B; }
+void operator/= (v3& A, r32 B) { A.X /= B; A.Y /= B; A.Z /= B; }
+void operator/= (v4& A, r32 B) { A.X /= B; A.Y /= B; A.Z /= B; A.W /= B; }
 
 bool operator == (v2 A, v2 B) { return ((A.X == B.X) && (A.Y == B.Y)); }
 bool operator == (v3 A, v3 B) { return ((A.X == B.X) && (A.Y == B.Y) && (A.Z == B.Z)); }
@@ -663,7 +663,9 @@ m44 operator* (m44 A, m44 B)
             r32 Acc = 0;
             for (int K = 0; K < 4; K++)
             {
-                Acc += M44Pos(A, X, K) * M44Pos(B, K, Y);
+                r32 AV = M44Pos(A, X, K);
+                r32 BV = M44Pos(B, K, Y);
+                Acc += AV * BV;
             }
             M44Pos(M, X, Y) = Acc;
         }
@@ -707,7 +709,7 @@ v4 operator* (m44 M, v4 V)
 internal m44
 M44Translation(v3 Offset)
 {
-    m44 Result = {0};
+    m44 Result = M44Identity();
     M44Pos(Result, 0, 3) = Offset.X;
     M44Pos(Result, 1, 3) = Offset.Y;
     M44Pos(Result, 2, 3) = Offset.Z;
@@ -765,7 +767,7 @@ M44Rotation(v3 Radians)
 internal m44
 M44Scale(v3 Scale)
 {
-    m44 Result = {0};
+    m44 Result = M44Identity();
     M44Pos(Result, 0, 0) = Scale.X;
     M44Pos(Result, 1, 1) = Scale.Y;
     M44Pos(Result, 2, 2) = Scale.Z;
@@ -862,8 +864,9 @@ M44ProjectionPerspective(r32 FOV, r32 AspectRatio, r32 Near, r32 Far)
 // Strings
 
 internal gs_const_string ConstString(char* Data, u64 Length) { return gs_const_string{Data, Length}; }
-internal gs_string String(char* Data, u64 Length, u64 Size) { return gs_string{Data, Size, Length}; }
-internal gs_string String(char* Data, u64 Length) { return gs_string{Data, Length, Length}; }
+internal gs_const_string ConstString(char* Data) { return gs_const_string{Data, CStringLength(Data)}; }
+internal gs_string MakeString(char* Data, u64 Length, u64 Size) { return gs_string{Data, Size, Length}; }
+internal gs_string MakeString(char* Data, u64 Length) { return gs_string{Data, Length, Length}; }
 
 internal bool IsSlash(char C) { return ((C == '/') || (C == '\\')); }
 internal bool IsUpper(char C) { return(('A' <= C) && (C <= 'Z')); }
@@ -1051,7 +1054,7 @@ StringsEqual(gs_string A, gs_string B)
 internal bool
 StringEqualsCharArray(gs_string A, char* B, u64 Length)
 {
-    gs_string BStr = String(B, Length);
+    gs_string BStr = MakeString(B, Length);
     return StringsEqual(A, BStr);
 }
 
@@ -1527,6 +1530,11 @@ CreateData(u8* Memory, u64 Size)
     gs_data Result = {Memory, Size};
     return Result;
 }
+internal bool
+DataIsNonEmpty(gs_data Data)
+{
+    return ((Data.Size > 0) && (Data.Memory != 0));
+}
 
 internal void* AllocatorAlloc_NoOp(u64 Size, u64* SizeResult) {
     *SizeResult = 0;
@@ -1571,7 +1579,9 @@ AllocatorFree_(gs_allocator* Allocator, void* Base, u64 Size, char* Location)
 }
 
 #define AllocatorAlloc(alloc,size) AllocatorAlloc_((alloc), (size), FileNameAndLineNumberString)
+#define AllocatorAllocStruct(alloc, type) (type*)(AllocatorAlloc((alloc), sizeof(type)).Memory)
 #define AllocatorAllocArray(alloc, type, count) (type*)(AllocatorAlloc((alloc), sizeof(type) * (count)).Memory)
+#define AllocatorAllocString(alloc, size) gs_string{ AllocatorAllocArray((alloc), char, (size)), 0, (size) }
 #define AllocatorFree(alloc,base,size) AllocatorFree_((alloc), (base), (size), FileNameAndLineNumberString)
 
 internal gs_memory_cursor
@@ -1603,10 +1613,6 @@ PushSizeOnCursor_(gs_memory_cursor* Cursor, u64 Size, char* Location)
         Result.Size = Size;
         Cursor->Position += Size;
     }
-    else
-    {
-        InvalidCodePath;
-    }
     return Result;
 }
 
@@ -1630,6 +1636,7 @@ internal gs_data
 AlignCursor(gs_memory_cursor* Cursor, u64 Alignment)
 {
     u64 Position = RoundUpTo64(Cursor->Position, Alignment);
+    Position = Min(Position, Cursor->Data.Size);
     u64 NewSize = Position - Cursor->Position;
     return PushSizeOnCursor(Cursor, NewSize);
 }
@@ -1753,7 +1760,10 @@ BeginTempArena(gs_temp_memory_arena* Temp, gs_memory_arena* Arena)
     gs_memory_cursor_list* CursorEntry = Arena->CursorList;
     Temp->Arena = Arena;
     Temp->CursorListSnapshot = CursorEntry;
-    Temp->PositionSnapshot = CursorEntry->Cursor.Position;
+    if (Temp->CursorListSnapshot != 0)
+    {
+        Temp->PositionSnapshot = CursorEntry->Cursor.Position;
+    }
 }
 internal void
 EndTempArena(gs_temp_memory_arena* Temp)
@@ -1815,6 +1825,7 @@ CreateDynarray_(gs_allocator* Allocator, u32 ElementSize, u32 ElementsPerBuffer)
     Result.Allocator = Allocator;
     Result.ElementSize = ElementSize;
     Result.ElementsPerBuffer = ElementsPerBuffer;
+    Result.ElementCount = 1; // index 0 is sentinel invalid value
     return Result;
 };
 internal u64
@@ -1851,9 +1862,6 @@ IndexToHandle(gs_dynarray* Array, u64 Index)
     gs_dynarray_handle Result = {0};
     Result.BufferIndex = Index / Array->ElementsPerBuffer;
     Result.IndexInBuffer = Index % Array->ElementsPerBuffer;
-#if !SHIP_MODE
-    Result.Array = Array;
-#endif
     return Result;
 }
 internal u64
@@ -1875,32 +1883,10 @@ TakeFreeElement(gs_dynarray* Array)
     Result = IndexToHandle(Array, ElementIndex);
     return Result;
 }
-internal gs_data
-GetElementInList_(gs_dynarray* Array, gs_dynarray_handle Handle, u64 SizeRequested)
-{
-    Assert(SizeRequested == Array->ElementSize);
-#if !SHIP_MODE
-    Assert(Handle.Array == Array);
-#endif
-    
-    gs_dynarray_buffer Buffer = Array->Buffers[Handle.BufferIndex];
-    
-    gs_data Result = {0};
-    Result.Memory = Buffer.Memory + Handle.IndexInBuffer;
-    Result.Size = SizeRequested;
-    
-    return Result;
-}
-internal gs_data
-GetElementInList_(gs_dynarray* Array, u64 Index, u64 SizeRequested)
-{
-    gs_dynarray_handle Handle = IndexToHandle(Array, Index);
-    return GetElementInList_(Array, Handle, SizeRequested);
-}
 internal bool
 HandleIsValid(gs_dynarray Array, gs_dynarray_handle Handle)
 {
-    bool Result = Handle.IndexInBuffer != 0 && Handle.BufferIndex != 0;
+    bool Result = !(Handle.IndexInBuffer == 0 && Handle.BufferIndex == 0);
     Result &= Handle.IndexInBuffer < Array.ElementsPerBuffer;
     Result &= Handle.BufferIndex < Array.BuffersCount;
     return Result;
@@ -1910,6 +1896,25 @@ IndexIsValid(gs_dynarray Array, u64 Index)
 {
     bool Result = (Index != 0) && (Index < DynarraySize(Array));
     return Result;
+}
+internal gs_data
+GetElementInList_(gs_dynarray* Array, gs_dynarray_handle Handle, u64 SizeRequested)
+{
+    Assert(SizeRequested == Array->ElementSize);
+    Assert(HandleIsValid(*Array, Handle));
+    gs_dynarray_buffer Buffer = Array->Buffers[Handle.BufferIndex];
+    
+    gs_data Result = {0};
+    Result.Memory = Buffer.Memory + (Handle.IndexInBuffer * Array->ElementSize);
+    Result.Size = SizeRequested;
+    
+    return Result;
+}
+internal gs_data
+GetElementInList_(gs_dynarray* Array, u64 Index, u64 SizeRequested)
+{
+    gs_dynarray_handle Handle = IndexToHandle(Array, Index);
+    return GetElementInList_(Array, Handle, SizeRequested);
 }
 internal void
 FreeDynarray(gs_dynarray* Array)
@@ -1933,7 +1938,13 @@ FreeDynarray(gs_dynarray* Array)
 //
 // File Handler
 
-internal gs_file*
+internal u64
+FileHandlerGetFileSize_NoOp(gs_file_handler FileHandler, gs_const_string Path)
+{
+    return 0;
+}
+
+internal gs_file
 FileHandlerReadFile_NoOp(gs_const_string Path)
 {
     return gs_file{0};
@@ -1952,35 +1963,43 @@ FileHandlerEnumerateDirectory_NoOp(gs_const_string Path, bool Recursive, bool In
 }
 
 internal gs_file_handler
-CreateFileHandler(file_handler_read_entire_file* ReadEntireFile,
+CreateFileHandler(file_handler_get_file_size* GetFileSize,
+                  file_handler_read_entire_file* ReadEntireFile,
                   file_handler_write_entire_file* WriteEntireFile,
                   file_handler_enumerate_directory* EnumerateDirectory,
                   gs_allocator* Allocator)
 {
+    if (GetFileSize == 0)
+    {
+        GetFileSize = (file_handler_get_file_size*)FileHandlerGetFileSize_NoOp;
+    }
     if (ReadEntireFile == 0)
     {
-        ReadEntireFile = FileHandlerReadFile_NoOp;
+        ReadEntireFile = (file_handler_read_entire_file*)FileHandlerReadFile_NoOp;
     }
     if (WriteEntireFile == 0)
     {
-        WriteEntireFile = FileHandlerWriteFile_NoOp;
+        WriteEntireFile = (file_handler_write_entire_file*)FileHandlerWriteFile_NoOp;
     }
     if (EnumerateDirectory == 0)
     {
-        EnumerateDirectory = FileHandlerEnumerateDirectory_NoOp;
+        EnumerateDirectory = (file_handler_enumerate_directory*)FileHandlerEnumerateDirectory_NoOp;
     }
     gs_file_handler Result = {0};
+    Result.GetFileSize = GetFileSize;
     Result.ReadEntireFile = ReadEntireFile;
     Result.WriteEntireFile = WriteEntireFile;
     Result.EnumerateDirectory = EnumerateDirectory;
     Result.Allocator = Allocator;
+    
+    return Result;
 }
 
 internal gs_const_string
 GetNullTerminatedPath(gs_file_handler FileHandler, gs_const_string Path)
 {
     gs_const_string NullTermPath = Path;
-    if (!IsNullterminated(NullTermPath))
+    if (!IsNullTerminated(NullTermPath))
     {
         AssertMessage("need to allocate a new string, Path to it, and null terminate");
         // TODO(Peter): Probably want to have some sort of temp memory,
@@ -1989,11 +2008,19 @@ GetNullTerminatedPath(gs_file_handler FileHandler, gs_const_string Path)
     return NullTermPath;
 }
 
+internal u64
+GetFileSize(gs_file_handler FileHandler, gs_const_string Path)
+{
+    Path = GetNullTerminatedPath(FileHandler, Path);
+    u64 Result = FileHandler.GetFileSize(FileHandler, Path);
+    return Result;
+}
+
 internal gs_file
 ReadEntireFile(gs_file_handler FileHandler, gs_const_string Path, gs_data Memory)
 {
     Path = GetNullTerminatedPath(FileHandler, Path);
-    gs_file Result = FileHandler.ReadEntireFile(Path, Memory);
+    gs_file Result = FileHandler.ReadEntireFile(FileHandler, Path, Memory);
     return Result;
 }
 
@@ -2002,7 +2029,7 @@ ReadEntireFile(gs_file_handler FileHandler, gs_const_string Path)
 {
     Path = GetNullTerminatedPath(FileHandler, Path);
     gs_file Result = {0};
-    u64 FileSize = FileHandler.GetFileSize(Path);
+    u64 FileSize = FileHandler.GetFileSize(FileHandler, Path);
     if (FileSize > 0)
     {
         gs_data FileMemory = AllocatorAlloc(FileHandler.Allocator, FileSize);
@@ -2015,14 +2042,14 @@ internal bool
 WriteEntireFile(gs_file_handler FileHandler, gs_const_string Path, gs_data Memory)
 {
     Path = GetNullTerminatedPath(FileHandler, Path);
-    return FileHandler.WriteEntireFile(Path, Memory);
+    return FileHandler.WriteEntireFile(FileHandler, Path, Memory);
 }
 
 internal gs_const_string_array
 EnumerateDirectory(gs_file_handler FileHandler, gs_const_string Path, u32 Flags)
 {
     Path = GetNullTerminatedPath(FileHandler, Path);
-    return FileHandler.EnumerateDirectory(Path, Flags);
+    return FileHandler.EnumerateDirectory(FileHandler, Path, Flags);
 }
 
 ///////////////////////////

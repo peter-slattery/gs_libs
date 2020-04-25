@@ -104,20 +104,18 @@ struct gsa_asset_handle
 struct gsa_asset_system
 {
     gs_allocator* Allocator;
-    gsa_platform_get_file_size* GetFileSize;
-    gsa_platform_read_entire_file* ReadEntireFile;
+    gs_file_handler* FileHandler;
     gs_memory_arena Transient;
     gs_memory_arena AssetMemory;
     gs_dynarray AssetHeaders;
 };
 
 static gsa_asset_system
-gsa_InitAssetSystem(gs_allocator* Allocator,  gsa_platform_get_file_size* GetFileSize, gsa_platform_read_entire_file* ReadEntireFile)
+gsa_InitAssetSystem(gs_allocator* Allocator, gs_file_handler* FileHandler)
 {
     gsa_asset_system Result = {0};
     Result.Allocator = Allocator;
-    Result.GetFileSize = GetFileSize;
-    Result.ReadEntireFile = ReadEntireFile;
+    Result.FileHandler = FileHandler;
     Result.Transient = CreateMemoryArena(Allocator);
     Result.AssetMemory = CreateMemoryArena(Allocator);
     Result.AssetHeaders = CreateDynarray(Allocator, gsa_asset, 32);
@@ -132,31 +130,24 @@ gsa_InitAssetSystem(gs_allocator* Allocator,  gsa_platform_get_file_size* GetFil
 static gsa_asset*
 gsa_GetAssetHeader(gsa_asset_system* AssetSystem, gs_dynarray_handle Handle)
 {
+    Assert(HandleIsValid(AssetSystem->AssetHeaders, Handle));
     gsa_asset* Asset = GetElement(&AssetSystem->AssetHeaders, gsa_asset, Handle);
     return Asset;
 }
 
 static gsa_asset*
-gsa_GetAssetHeader(gsa_asset_system* AssetSystem, u32 Index)
+gsa_TakeAsset(gsa_asset_system* AssetSystem, gs_dynarray_handle* HandleOut)
 {
-    Assert(IndexIsValid(AssetSystem->AssetHeaders, Index));
-    gs_dynarray_handle Handle = IndexToHandle(&AssetSystem->AssetHeaders, Index);
-    return gsa_GetAssetHeader(AssetSystem, Handle);
-}
-
-static gsa_asset*
-gsa_TakeAsset(gsa_asset_system* AssetSystem, u32* IndexOut)
-{
-    gs_dynarray_handle AssetHandle = TakeFreeElement(&AssetSystem->AssetHeaders);
-    gsa_asset* Result = gsa_GetAssetHeader(AssetSystem, AssetHandle);
+    *HandleOut = TakeFreeElement(&AssetSystem->AssetHeaders);
+    gsa_asset* Result = gsa_GetAssetHeader(AssetSystem, *HandleOut);
     return Result;
 }
 
 static gsa_asset*
-gsa_TakeAsset(gsa_asset_system* AssetSystem, char* Path, gsa_asset_type Type, u32* IndexOut)
+gsa_TakeAsset(gsa_asset_system* AssetSystem, gs_const_string Path, gsa_asset_type Type, gs_dynarray_handle* HandleOut)
 {
-    gsa_asset* Asset = gsa_TakeAsset(AssetSystem, IndexOut);
-    Asset->PathHash = HashDJB2ToU32(Path);
+    gsa_asset* Asset = gsa_TakeAsset(AssetSystem, HandleOut);
+    Asset->PathHash = HashDJB2ToU32(StringExpand(Path));
     Asset->Type = Type;
     return Asset;
 }
@@ -179,23 +170,22 @@ gsa_MemCopy(u32 Length, u8* From, u8* To)
 // Text
 //
 
-static u32
-gsa_CreateTextAsset(gsa_asset_system* AssetSystem, char* Path, u32 FileLength, u8* FileMemory)
+static gs_dynarray_handle
+gsa_CreateTextAsset(gsa_asset_system* AssetSystem, gs_const_string Path, gs_data Memory)
 {
-    Assert(FileLength > 0);
-    Assert(FileMemory);
+    Assert(DataIsNonEmpty(Memory));
     
-    u32 Result = GSA_INVALID_ASSET_HANDLE;
+    gs_dynarray_handle Result = {0};
     gsa_asset* TextAsset = gsa_TakeAsset(AssetSystem, Path, gsa_AssetType_gsa_text, &Result);
     
-    gs_data AssetMemory = PushSizeToData(&AssetSystem->AssetMemory, sizeof(gsa_text) + FileLength);
+    gs_data AssetMemory = PushSizeToData(&AssetSystem->AssetMemory, sizeof(gsa_text) + Memory.Size);
     gs_memory_cursor AssetMemoryCursor = CreateMemoryCursor(AssetMemory);
     
     TextAsset->Text = PushStructOnCursor(&AssetMemoryCursor, gsa_text);
-    TextAsset->Text->Length = FileLength;
-    TextAsset->Text->Memory = PushArrayOnCursor(&AssetMemoryCursor, char, FileLength);
+    TextAsset->Text->Length = Memory.Size;
+    TextAsset->Text->Memory = PushArrayOnCursor(&AssetMemoryCursor, char, Memory.Size);
     
-    gsa_MemCopy(FileLength, FileMemory, (u8*)TextAsset->Text->Memory);
+    CopyMemoryTo(Memory.Memory, TextAsset->Text->Memory, Memory.Size);
     
     return Result;
 }
@@ -204,20 +194,18 @@ gsa_CreateTextAsset(gsa_asset_system* AssetSystem, char* Path, u32 FileLength, u
 // Textures
 //
 
-static u32
-gsa_CreateImageAsset(gsa_asset_system* AssetSystem, char* Path, u32 FileLength, u8* FileMemory)
+static gs_dynarray_handle
+gsa_CreateImageAsset(gsa_asset_system* AssetSystem, gs_const_string Path, gs_data Memory)
 {
-    Assert(FileLength > 0);
-    Assert(FileMemory);
+    Assert(DataIsNonEmpty(Memory));
     
-    u32 Result = GSA_INVALID_ASSET_HANDLE;
+    gs_dynarray_handle Result = {0};
     gsa_asset* ImageAsset = gsa_TakeAsset(AssetSystem, Path, gsa_AssetType_gsa_image, &Result);
-    
     
     ImageAsset->Image = PushStruct(&AssetSystem->AssetMemory, gsa_image);
     // TODO(Peter): stbi_load actually loads the file again, which we've already done at this stage
     // There should be a variant which just takes in a memory stream
-    ImageAsset->Image->Data = stbi_load(Path, &ImageAsset->Image->Width, &ImageAsset->Image->Height, &ImageAsset->Image->Channels, 0);
+    ImageAsset->Image->Data = stbi_load(Path.Str, &ImageAsset->Image->Width, &ImageAsset->Image->Height, &ImageAsset->Image->Channels, 0);
     Assert(ImageAsset->Image->Data);
     
     return Result;
@@ -227,20 +215,19 @@ gsa_CreateImageAsset(gsa_asset_system* AssetSystem, char* Path, u32 FileLength, 
 // Models
 //
 
-static u32
-gsa_CreateModelAsset(gsa_asset_system* AssetSystem, char* Path, u32 FileLength, u8* FileMemory)
+static gs_dynarray_handle
+gsa_CreateModelAsset(gsa_asset_system* AssetSystem, gs_const_string Path, gs_data Memory)
 {
-    Assert(FileLength > 0);
-    Assert(FileMemory);
+    Assert(DataIsNonEmpty(Memory));
     
-    u32 Result = GSA_INVALID_ASSET_HANDLE;
+    gs_dynarray_handle Result = {0};
     gsa_asset* ModelAsset = gsa_TakeAsset(AssetSystem, Path, gsa_AssetType_gsa_model, &Result);
     
     // TODO(Peter): Memory Management - the gsa_model, the file, and the model data
     // Pull Memory MAnagement out of the obj loader See stb_image for how
     ModelAsset->Model = PushStruct(&AssetSystem->AssetMemory, gsa_model);
     
-    gso_compressed_obj Obj = gso_CreateObj(FileMemory, FileLength);
+    gso_compressed_obj Obj = gso_CreateObj(Memory);
     
     ModelAsset->Model->VertexBuffer = (u8*)Obj.Verteces;
     ModelAsset->Model->VertexCount = Obj.VertexCount;
@@ -261,26 +248,28 @@ gsa_CreateModelAsset(gsa_asset_system* AssetSystem, char* Path, u32 FileLength, 
 //
 
 #define gsa_GetAsset(assetSystem, index, type) (type*)gsa_GetAssetOfType((assetSystem), (index), gsa_AssetType_##type)
+
 static u8*
-gsa_GetAssetOfType(gsa_asset_system* AssetSystem, u32 Index, gsa_asset_type Type)
+gsa_GetAssetOfType(gsa_asset_system* AssetSystem, gs_dynarray_handle Handle, gsa_asset_type Type)
 {
     u8* Result = 0;
-    gsa_asset* Asset = gsa_GetAssetHeader(AssetSystem, Index);
+    gsa_asset* Asset = gsa_GetAssetHeader(AssetSystem, Handle);
     Assert(Asset->Type = Type);
     Result = Asset->Asset;
     return Result;
 }
 
 static u8*
-gsa_GetAssetOfType(gsa_asset_system* AssetSystem, char* Path, gsa_asset_type Type)
+gsa_GetAssetOfType(gsa_asset_system* AssetSystem, gs_const_string Path, gsa_asset_type Type)
 {
     u8* Result = 0;
-    u32 PathHash = HashDJB2ToU32(Path);
+    u32 PathHash = HashDJB2ToU32(StringExpand(Path));
     s32 AssetIndex = -1;
     gsa_asset* AssetHeader = 0;
-    for (u32 i = 1; i <= AssetSystem->AssetHeaders.ElementCount; i++)
+    for (u32 i = 1; i < AssetSystem->AssetHeaders.ElementCount; i++)
     {
-        gsa_asset* CheckAsset = gsa_GetAssetHeader(AssetSystem, i);
+        gs_dynarray_handle Handle = IndexToHandle(&AssetSystem->AssetHeaders, i);
+        gsa_asset* CheckAsset = gsa_GetAssetHeader(AssetSystem, Handle);
         if (CheckAsset->PathHash == PathHash)
         {
             AssetIndex = i;
@@ -294,35 +283,35 @@ gsa_GetAssetOfType(gsa_asset_system* AssetSystem, char* Path, gsa_asset_type Typ
     }
     else
     {
-        u32 FileLength = AssetSystem->GetFileSize(Path);
-        u8* FileMemory = PushSize(&AssetSystem->Transient, FileLength);
-        if (AssetSystem->ReadEntireFile(Path, FileMemory, FileLength))
+        u32 FileLength = GetFileSize(*AssetSystem->FileHandler, Path);
+        gs_data FileMemory = PushSizeToData(&AssetSystem->Transient, FileLength);
+        gs_file File = ReadEntireFile(*AssetSystem->FileHandler, Path, FileMemory);
+        if (File.Data.Size > 0)
         {
-            if (FileLength > 0 && FileMemory)
+            if (FileLength > 0 && FileMemory.Memory)
             {
-                u32 AssetHandle = 0;
+                gs_dynarray_handle AssetHandle = INVALID_DYNARRAY_HANDLE;
                 switch (Type)
                 {
                     case gsa_AssetType_gsa_text:
                     {
-                        AssetHandle = gsa_CreateTextAsset(AssetSystem, Path, FileLength, FileMemory);
+                        AssetHandle = gsa_CreateTextAsset(AssetSystem, Path, FileMemory);
                     }break;
                     
                     case gsa_AssetType_gsa_image:
                     {
-                        AssetHandle = gsa_CreateImageAsset(AssetSystem, Path, FileLength, FileMemory);
+                        AssetHandle = gsa_CreateImageAsset(AssetSystem, Path, FileMemory);
                     }break;
                     
                     case gsa_AssetType_gsa_model:
                     {
-                        AssetHandle = gsa_CreateModelAsset(AssetSystem, Path, FileLength, FileMemory);
+                        AssetHandle = gsa_CreateModelAsset(AssetSystem, Path, FileMemory);
                     }break;
+                    
+                    InvalidDefaultCase;
                 }
                 
-                if (AssetHandle)
-                {
-                    Result = gsa_GetAssetOfType(AssetSystem, AssetHandle, Type);
-                }
+                Result = gsa_GetAssetOfType(AssetSystem, AssetHandle, Type);
             } else {
                 InvalidCodePath;
             }

@@ -21,19 +21,19 @@
 #ifndef GS_TIME_H
 
 #ifndef GS_TYPES_H
-# error ""
+# error "gs_time.h relies on gs_types.h. Please include that file first."
 #endif
 
 typedef struct gs_time_info gs_time_info;
-typedef long long int gs_time_stamp;
+typedef s64 gs_time_stamp;
 
 #define NANOS_PER_USEC 1000ULL
 #define NANOS_PER_MILLISEC 1000ULL * NANOS_PER_USEC
 #define NANOS_PER_SEC 1000ULL * NANOS_PER_MILLISEC
 
-static gs_time_info gs_InitializeTimeInfo(int* ErrorOut);
-static gs_time_stamp gs_GetWallClock(int* ErrorOut);
-static double gs_GetSecondsElapsed(gs_time_info Info, gs_time_stamp Start, gs_time_stamp End);
+internal gs_time_info gs_InitializeTimeInfo(s32* ErrorOut);
+internal gs_time_stamp gs_GetWallClock(s32* ErrorOut);
+internal r64 gs_GetSecondsElapsed(gs_time_info Info, gs_time_stamp Start, gs_time_stamp End);
 
 #ifdef GS_CSTDLIB
 #endif
@@ -45,18 +45,18 @@ struct gs_time_info
     gs_time_stamp PerformanceCountFrequency;
 };
 
-static void
-gs_TimeGetLastError(int* ErrorOut = 0)
+internal void
+gs_TimeGetLastError(s32* ErrorOut = 0)
 {
-    int Error = GetLastError();
+    s32 Error = GetLastError();
     if (ErrorOut != 0)
     {
         *ErrorOut = Error;
     }
 }
 
-static gs_time_info
-gs_InitializeTimeInfo(int* ErrorOut = 0)
+internal gs_time_info
+gs_InitializeTimeInfo(s32* ErrorOut = 0)
 {
     gs_time_info Result = {0};
     LARGE_INTEGER Frequency;
@@ -71,8 +71,8 @@ gs_InitializeTimeInfo(int* ErrorOut = 0)
     return Result;
 }
 
-static gs_time_stamp
-gs_GetWallClock(int* ErrorOut = 0)
+internal gs_time_stamp
+gs_GetWallClock(s32* ErrorOut = 0)
 {
     gs_time_stamp Result = 0;
     LARGE_INTEGER Time;
@@ -87,11 +87,17 @@ gs_GetWallClock(int* ErrorOut = 0)
     return Result;
 }
 
-static double
+internal r64
 gs_GetSecondsElapsed(gs_time_info TimeInfo, gs_time_stamp Start, gs_time_stamp End)
 {
-    double Result = ((double)(End - Start) / (double)TimeInfo.PerformanceCountFrequency);
+    r64 Result = ((r64)(End - Start) / (r64)TimeInfo.PerformanceCountFrequency);
     return Result;
+}
+
+internal void
+gs_Sleep(u64 SleepTime)
+{
+    Sleep(SleepTime);
 }
 
 #endif
@@ -104,8 +110,8 @@ struct gs_time_info
     mach_timebase_info_data_t MachTimeInfo;
 };
 
-static gs_time_info
-gs_InitializeTimeInfo(int* ErrorOut = 0)
+internal gs_time_info
+gs_InitializeTimeInfo(s32* ErrorOut = 0)
 {
     gs_time_info Result = {0};
     Result.StartTimeAbsolute = mach_absolute_time();
@@ -113,23 +119,44 @@ gs_InitializeTimeInfo(int* ErrorOut = 0)
     return Result;
 }
 
-static gs_time_stamp
-gs_GetWallClock(int* ErrorOut = 0)
+internal gs_time_stamp
+gs_GetWallClock(s32* ErrorOut = 0)
 {
     gs_time_stamp Result = mach_absolute_time();
     return Result;
 }
 
-static double
+internal r64
 gs_GetSecondsElapsed(gs_time_info Info, gs_time_stamp Start, gs_time_stamp End)
 {
-    double Result = 0;
-	double Elapsed = (double)(End - Start);
-	Result = Elapsed * (double)(TimeInfo.MachTimeInfo.numer) / (double)NANOS_PER_SEC / (double)TimeInfo.MachTimeInfo.denom;
+    r64 Result = 0;
+	r64 Elapsed = (r64)(End - Start);
+	Result = Elapsed * (r64)(TimeInfo.MachTimeInfo.numer) / (r64)NANOS_PER_SEC / (r64)TimeInfo.MachTimeInfo.denom;
 	return Result;
 }
 
+internal void
+gs_Sleep(u64 SleepTime)
+{
+    InvalidCodePath;
+}
+
 #endif
+
+internal gs_time_stamp
+gs_SleepUntilTargetReached(gs_time_info TimeInfo, gs_time_stamp Start, r64 TargetSecondsPerFrame)
+{
+    s64 FrameEndTime = gs_GetWallClock();
+    r64 SecondsElapsed = gs_GetSecondsElapsed(TimeInfo, Start, FrameEndTime);
+    while (SecondsElapsed < TargetSecondsPerFrame)
+    {
+        u32 SleepTime = 1000.0 * (TargetSecondsPerFrame - SecondsElapsed);
+        gs_Sleep(SleepTime);
+        SecondsElapsed = gs_GetSecondsElapsed(TimeInfo, Start, gs_GetWallClock());
+    }
+    s64 EndTime = gs_GetWallClock();
+    return EndTime;
+}
 
 #define GS_TIME_H
 #endif // GS_TIME_H

@@ -7,87 +7,6 @@
 
 typedef struct gs_window gs_window;
 
-enum gs_event_type
-{
-    // Reached end of event stream
-    gs_EventType_NoMoreEvents,
-    // There was an event but it requires no action from the using program
-    gs_EventType_NoEvent,
-    
-    gs_EventType_KeyPressed,
-    gs_EventType_KeyReleased,
-    
-    gs_EventType_Count,
-};
-
-enum gs_key
-{
-    gs_Key_Invalid,
-    
-    gs_Key_Esc,
-    
-    gs_Key_Space,
-    gs_Key_Tab,
-    gs_Key_CapsLock,
-    gs_Key_LeftShift, gs_Key_RightShift,
-    gs_Key_LeftCtrl, gs_Key_RightCtrl,
-    gs_Key_Fn,
-    gs_Key_Alt,
-    gs_Key_PageUp, gs_Key_PageDown,
-    gs_Key_Backspace, gs_Key_Delete,
-    gs_Key_Enter,
-    
-    // Function Keys
-    gs_Key_F0, gs_Key_F1, gs_Key_F2, gs_Key_F3, gs_Key_F4, gs_Key_F5, gs_Key_F6, gs_Key_F7,
-    gs_Key_F8, gs_Key_F9, gs_Key_F10, gs_Key_F11, gs_Key_F12,
-    
-    // Letters
-    gs_Key_a, gs_Key_b, gs_Key_c, gs_Key_d, gs_Key_e, gs_Key_f, gs_Key_g, gs_Key_h,
-    gs_Key_i, gs_Key_j, gs_Key_k, gs_Key_l, gs_Key_m, gs_Key_n, gs_Key_o, gs_Key_p,
-    gs_Key_q, gs_Key_r, gs_Key_s, gs_Key_t, gs_Key_u, gs_Key_v, gs_Key_w, gs_Key_x,
-    gs_Key_y, gs_Key_z,
-    
-    gs_Key_A, gs_Key_B, gs_Key_C, gs_Key_D, gs_Key_E, gs_Key_F, gs_Key_G, gs_Key_H,
-    gs_Key_I, gs_Key_J, gs_Key_K, gs_Key_L, gs_Key_M, gs_Key_N, gs_Key_O, gs_Key_P,
-    gs_Key_Q, gs_Key_R, gs_Key_S, gs_Key_T, gs_Key_U, gs_Key_V, gs_Key_W, gs_Key_X,
-    gs_Key_Y, gs_Key_Z,
-    
-    // Numbers
-    gs_Key_0, gs_Key_1, gs_Key_2, gs_Key_3, gs_Key_4, gs_Key_5, gs_Key_6, gs_Key_7,
-    gs_Key_8, gs_Key_9,
-    
-    gs_Key_Num0, gs_Key_Num1, gs_Key_Num2, gs_Key_Num3, gs_Key_Num4, gs_Key_Num5,
-    gs_Key_Num6, gs_Key_Num7, gs_Key_Num8, gs_Key_Num9,
-    
-    // Symbols
-    gs_Key_Bang, gs_Key_At, gs_Key_Pound, gs_Key_Dollar, gs_Key_Percent, gs_Key_Carrot,
-    gs_Key_Ampersand, gs_Key_Star, gs_Key_LeftParen, gs_Key_RightParen, gs_Key_Minus, gs_Key_Plus,
-    gs_Key_Equals, gs_Key_Underscore, gs_Key_LeftBrace, gs_Key_RightBrace, gs_Key_LeftBracket,
-    gs_Key_RightBracket, gs_Key_Colon, gs_Key_SemiColon, gs_Key_SingleQuote, gs_Key_DoubleQuote,
-    gs_Key_ForwardSlash, gs_Key_Backslash, gs_Key_Pipe, gs_Key_Comma, gs_Key_Period,
-    gs_Key_QuestionMark, gs_Key_LessThan, gs_Key_GreaterThan, gs_Key_Tilde, gs_Key_BackQuote,
-    
-    // Arrows
-    gs_Key_UpArrow,
-    gs_Key_DownArrow,
-    gs_Key_LeftArrow,
-    gs_Key_RightArrow,
-    
-    // Mouse
-    // NOTE(Peter): Including this here so we can utilize the same KeyDown, KeyUp etc. functions
-    gs_Key_MouseLeftButton,
-    gs_Key_MouseMiddleButton,
-    gs_Key_MouseRightButton,
-    
-    gs_Key_Count,
-};
-
-struct gs_input_event
-{
-    gs_event_type Type;
-    gs_key Key;
-};
-
 // TODO(Peter): More options
 static gs_window gs_CreateWindow(char* Title, int Width, int Height);
 static bool gs_WindowIsOpen(gs_window Window);
@@ -100,8 +19,11 @@ static bool gs_TakeNextInputEvent(gs_window Window, gs_input_event* Event);
 static void
 gs_Win32PrintLastError_(char* File, u32 Line)
 {
+    char DebugStringData[256];
+    gs_string DebugString = MakeString(DebugStringData, 0, 256);
     u32 Error = GetLastError();
-    printf("%s Line %d: Error %d\n", File, Line, Error);
+    PrintF(&DebugString, "%s Line %d: Error %d\n\0", File, Line, Error);
+    OutputDebugStringA(DebugString.Str);
 }
 
 struct gs_window
