@@ -1,0 +1,60 @@
+version(1);
+project_name = "foo";
+patterns = {
+"*.c",
+"*.cpp",
+"*.h",
+"*.m",
+"*.bat",
+"*.sh",
+"*.4coder",
+};
+blacklist_patterns = {
+".*",
+};
+load_paths_base = {
+ { ".", .relative = true, .recursive = true, },
+};
+load_paths = {
+ { load_paths_base, .os = "win", },
+ { load_paths_base, .os = "linux", },
+ { load_paths_base, .os = "mac", },
+};
+
+command_list = {
+{ .name = "build tests",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .cmd = { { "bin\run_tests.bat" , .os = "win"   },
+            { "./bin/build.sh", .os = "linux" },
+            { "./bin/build.sh", .os = "mac"   }, }, },
+
+{ .name = "build test builder",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .cmd = { { "bin\build_test_builder.bat" , .os = "win"   },
+            { "./bin/build.sh", .os = "linux" },
+            { "./bin/build.sh", .os = "mac"   }, }, },
+
+{ .name = "build scratch",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .cmd = { { "bin\build_scratch.bat" , .os = "win"   },
+            { "./bin/build.sh", .os = "linux" },
+            { "./bin/build.sh", .os = "mac"   }, }, },
+
+{ .name = "build single",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .cmd = { { "bin\build_single.bat" , .os = "win"   },
+            { "./bin/build.sh", .os = "linux" },
+            { "./bin/build.sh", .os = "mac"   }, }, },
+
+{ .name = "build meta",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .cmd = { { "bin\build_meta.bat" , .os = "win"   },
+            { "./bin/build.sh", .os = "linux" },
+            { "./bin/build.sh", .os = "mac"   }, }, },
+
+};
+fkey_command[1] = "build tests";
+fkey_command[2] = "build test builder";
+fkey_command[3] = "build scratch";
+fkey_command[4] = "build single";
+fkey_command[5] = "build meta";

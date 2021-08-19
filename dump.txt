@@ -1,0 +1,47 @@
+==== FRAME 0 ====
+WindowShouldClose...............1 cy             0.000000 sec
+WindowGetDim....................0 cy             0.000000 sec
+WindowPollEvents................15102 cy         0.001510 sec
+WindowSwapBuffers...............14986 cy         0.001499 sec
+GfxSetWindowCurrent.............1094 cy          0.000109 sec
+Win32GLCtx......................0 cy             0.000000 sec
+Win32GLSetWindowCurrent.........1089 cy          0.000109 sec
+GfxSetViewport..................43 cy            0.000004 sec
+GfxClearBuffer..................2905 cy          0.000291 sec
+GfxShaderProgramActivate........112 cy           0.000011 sec
+GfxUniformMatrixSet.............88 cy            0.000009 sec
+GfxVertexBufferDraw.............2588 cy          0.000259 sec
+main............................37219 cy         0.003722 sec
+
+==== FRAME ====
+WindowShouldClose...............1 cy             0.000000 sec
+WindowGetDim....................2 cy             0.000000 sec
+WindowPollEvents................7361 cy          0.000736 sec
+WindowSwapBuffers...............926827 cy        0.092683 sec
+GfxSetWindowCurrent.............913089 cy        0.091309 sec
+Win32GLCtx......................0 cy             0.000000 sec
+Win32GLSetWindowCurrent.........913074 cy        0.091307 sec
+GfxSetViewport..................6 cy             0.000001 sec
+GfxClearBuffer..................375 cy           0.000037 sec
+GfxShaderProgramActivate........81 cy            0.000008 sec
+GfxUniformMatrixSet.............27 cy            0.000003 sec
+GfxVertexBufferDraw.............126 cy           0.000013 sec
+main............................1847977 cy       0.184798 sec
+
+==== FRAME ====
+WindowShouldClose...............1 cy             0.000000 sec
+WindowGetDim....................2 cy             0.000000 sec
+WindowPollEvents................2518 cy          0.000252 sec
+WindowSwapBuffers...............2086871 cy       0.208687 sec
+GfxSetWindowCurrent.............1253932 cy       0.125393 sec
+Win32GLCtx......................0 cy             0.000000 sec
+Win32GLSetWindowCurrent.........1253922 cy       0.125392 sec
+GfxSetViewport..................7 cy             0.000001 sec
+GfxClearBuffer..................263 cy           0.000026 sec
+GfxShaderProgramActivate........57 cy            0.000006 sec
+GfxUniformMatrixSet.............21 cy            0.000002 sec
+GfxVertexBufferDraw.............83 cy            0.000008 sec
+main............................3343823 cy       0.334382 sec
+
+
+

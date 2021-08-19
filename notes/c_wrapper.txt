@@ -1,0 +1,45 @@
+# C Wrapper
+
+What I really want is something that makes writing C easier
+
+Big pains in the ass:
+- typedef and predeclaring stuff
+- order independent declarations
+- explicit generics
+  As in, I don't mind having to do something like:
+    GENERATE_FOR($T)
+    WHERE($T.match((r32, u32, r64, u64)))
+    {
+      $T add($T a, $T b) { return a + b; }
+    }
+  to get:
+    r32 add(r32 a, r32 b) { return a + b; }
+    u32 add(u32 a, u32 b) { return a + b; }
+    r64 add(r64 a, r64 b) { return a + b; }
+    u64 add(u64 a, u64 b) { return a + b; }
+- type information
+- string versions of enums
+
+Nice to have:
+- instrument code with a custom preprocessor
+- instrument debug info to point back to the original code
+    - better yet, instrument it to point to both the generated code
+      AND the original code
+- using, defer
+
+Really nice to have:
+- output to different syntaxes (JS)
+
+Things that will make writing something like this easier:
+- top level declarations have keywords
+  ie. func, enum, struct
+- really consistent assignment syntax
+  ie. (identifier) : (type) = (value)
+  examples:
+    my_int : u32 = 0xFF;
+    my_proc : func ( arg : u32 ) -> r32 = { < function body > }
+    my_enum : enum = { < enum values > }
+- a block that specifies that it shouldn't be translated, rather just copy    it straight to the output buffer. Probably want flags for different       
+  languages
+
+
