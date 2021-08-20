@@ -8,17 +8,33 @@ and builds a .bat file that compiles each of them, and then runs them
 # pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
-#include <windows.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "platform.h"
-#include "platform_win32.h"
+
+#if defined(_WIN32) || defined(_WIN64)
+# undef PLATFORM_WINDOWS
+# define PLATFORM_WINDOWS 1
+#endif
+
+#if defined(__APPLE__) && defined(__MACH__)
+# undef PLATFORM_OSX
+# define PLATFORM_OSX 1
+#endif
+
+#if defined(PLATFORM_WIN32)
+# include <windows.h>
+# include "platform_win32.h"
+#elif defined(PLATFORM_OSX)
+# include <dirent.h>
+# include <errno.h>
+# include "platform_osx.h"
+#endif
 
 #include "settings.h"
-int SetupCommandsLength     = CArrayLength(SetupCommands);
-int BuildCommandLength      = CArrayLength(BuildCommand);
-int CleanupCommandsLength = CArrayLength(CleanupCommands);
 
 typedef struct str_list{
     char* Str;
@@ -26,7 +42,8 @@ typedef struct str_list{
 } str_list;
 
 str_list* SearchDirs = 0;
-str_list* BuildStr = 0;
+str_list* Win32_BuildStr = 0;
+str_list* OSX_BuildStr = 0;
 
 bool StrIsDir (char* Path, int Len)
 {
@@ -54,14 +71,25 @@ str_list* PushStrOnSearchList (int Length)
     return Next;
 }
 
-str_list* PushStrOnBuildString ()
+str_list* PushStrOnBuildString_OSX ()
 {
     str_list* Next = AllocStr(2048);
-    if (BuildStr != 0) 
+    if (OSX_BuildStr != 0) 
     {
-        Next->Next = BuildStr;
+        Next->Next = OSX_BuildStr;
     }
-    BuildStr = Next;
+    OSX_BuildStr = Next;
+    return Next;
+}
+
+str_list* PushStrOnBuildString_Win32 ()
+{
+    str_list* Next = AllocStr(2048);
+    if (Win32_BuildStr != 0) 
+    {
+        Next->Next = Win32_BuildStr;
+    }
+    Win32_BuildStr = Next;
     return Next;
 }
 
@@ -116,8 +144,11 @@ char* AllocSearchString (char* Dir, char* ParentDir)
     {
         PrintAt += sprintf(PrintAt, "\\");
     }
+
+    #if defined(PLATFORM_WIN32)
     PrintAt += sprintf(PrintAt, "*");
-    
+    #endif
+
     Result = Next->Str;
     return Result;;
 }
@@ -132,14 +163,18 @@ void FreeAllSearchDirs () {
     }
 }
 
-void FreeAllBuildStrs () {
-    str_list* At = BuildStr;
+void FreeAllBuildStrs_ (str_list* At)
+{
     while (At != 0)
     {
         str_list* NextAt = At->Next;
         free(At);
         At = NextAt;
     }
+}
+void FreeAllBuildStrs () {
+    FreeAllBuildStrs_(Win32_BuildStr);
+    FreeAllBuildStrs_(OSX_BuildStr);
 }
 
 void PushBuildString (char* TestFilePath, char* FileName)
@@ -161,18 +196,28 @@ void PushBuildString (char* TestFilePath, char* FileName)
         return;
     }
     
-    str_list* BuildString = PushStrOnBuildString();
-    char* At = BuildString->Str;
-    
+    str_list* Win32_BuildString = PushStrOnBuildString_Win32();
+    char* At = Win32_BuildString->Str;
     At += sprintf(At, "echo COMPILING %.*s...\n\n", LastPeriodIndex, FileName);
     At += sprintf(At, "set TestFileNoExtensions=%.*s\n", LastPeriodIndex, FileName);
     At += sprintf(At, "set TestFileFullPath=%s\n", TestFilePath);
-    
-    for (int i = 0; i < BuildCommandLength; i++)
+    for (int i = 0; i < BuildCommandsLength_Win32; i++)
     {
-        At += sprintf(At, "%s", BuildCommand[i]);
+        At += sprintf(At, "%s", BuildCommands_Win32[i]);
     }
     At += sprintf(At, "echo.\n\n");
+
+    str_list* OSX_BuildString = PushStrOnBuildString_OSX();
+    At = OSX_BuildString->Str;
+    At += sprintf(At, "echo COMPILING %.*s...\n\n", LastPeriodIndex, FileName);
+    At += sprintf(At, "TestFileNoExtensions=%.*s\n", LastPeriodIndex, FileName);
+    At += sprintf(At, "TestFileFullPath=%s\n", TestFilePath);
+    for (int i = 0; i < BuildCommandsLength_OSX; i++)
+    {
+        At += sprintf(At, "%s", BuildCommands_OSX[i]);
+    }
+    At += sprintf(At, "echo.\n\n");
+    
 }
 
 void BuildTestBatchFile (char* SearchDir, char* ParentDir)
@@ -201,23 +246,14 @@ void BuildTestBatchFile (char* SearchDir, char* ParentDir)
     }
 }
 
-int main(int ArgCount, char** Args)
+void
+WriteOutputFile(
+    FILE* OutputFileHandle,
+    str_list* BuildStr,
+    char** SetupCommands, int SetupCommandsLength,
+    char** BuildCommands, int BuildCommandLength,
+    char** CleanupCommands, int CleanupCommandsLength)
 {
-    bool DisplayHelp = ((ArgCount == 1) ||
-                        (ArgCount == 2 && !strcmp(Args[0], "--help")));
-    if (DisplayHelp)
-    {
-        printf("Usage:\n");
-        printf("\ttest_builder.exe --help: Print this message\n");
-        printf("\ttest_builder.exe <path_to_test_dir>: will iterate over all *.test.cpp files at that path and build a .bat file which compiles and runs each of them\n");
-        return(0);
-    }
-    
-    // Look up the first file at TestDir
-    char* TestDir = Args[1];
-    BuildTestBatchFile(TestDir, 0);
-    
-    FILE* OutputFileHandle = fopen("build_and_run_tests.bat", "w");
     if (OutputFileHandle)
     {
         // Write Preamble
@@ -252,6 +288,39 @@ int main(int ArgCount, char** Args)
     } else {
         printf("Error: Could not create build_and_run_tests.bat\nAborting\n");
     }
+}
+
+int main(int ArgCount, char** Args)
+{
+    bool DisplayHelp = ((ArgCount == 1) ||
+                        (ArgCount == 2 && !strcmp(Args[0], "--help")));
+    if (DisplayHelp)
+    {
+        printf("Usage:\n");
+        printf("\ttest_builder.exe --help: Print this message\n");
+        printf("\ttest_builder.exe <path_to_test_dir>: will iterate over all *.test.cpp files at that path and build a .bat file which compiles and runs each of them\n");
+        return(0);
+    }
+    
+    // Look up the first file at TestDir
+    char* TestDir = Args[1];
+    BuildTestBatchFile(TestDir, 0);
+    
+    FILE* OutputFileHandle_Win32 = fopen("build_and_run_tests.bat", "w");
+    WriteOutputFile(
+        OutputFileHandle_Win32, 
+        Win32_BuildStr,
+        SetupCommands_Win32, SetupCommandsLength_Win32,
+        BuildCommands_Win32, BuildCommandsLength_Win32,
+        CleanupCommands_Win32, CleanupCommandsLength_Win32);
+
+    FILE* OutputFileHandle_OSX = fopen("build_and_run_tests.sh", "w");
+    WriteOutputFile(
+        OutputFileHandle_OSX,
+        OSX_BuildStr, 
+        SetupCommands_OSX, SetupCommandsLength_OSX,
+        BuildCommands_OSX, BuildCommandsLength_OSX,
+        CleanupCommands_OSX, CleanupCommandsLength_OSX);
     
     // Clean Up
     FreeAllSearchDirs();

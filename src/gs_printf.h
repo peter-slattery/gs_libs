@@ -11,6 +11,8 @@
 # define InvalidCodePath
 #endif
 
+# include <stdarg.h>
+
 // TODO(PS): Context Logging
 #define PRINTF_ERROR InvalidCodePath
 

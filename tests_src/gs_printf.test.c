@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-#include <windows.h>
+
 #include "../src/gs_tests.h"
 
 #define GS_PLATFORM_IMPLEMENTATION
@@ -11,6 +11,10 @@
 #include "../src/gs_assert.h"
 #include "../src/memory/gs_memory.h"
 #include "../src/gs_printf.h"
+
+#ifdef GS_PLATFORM_WINDOWS
+# include <windows.h>
+#endif
 
 internal bool
 TestStringsEqual(char* A, char* B, u64 Len)
