@@ -140,7 +140,9 @@ typedef struct gs_data64
 {
   u8* Memory;
   u64 Size;
-} gs_data64, gs_data;
+} gs_data64;
+
+typedef struct gs_data64 gs_data;
 
 //
 // Utility Functions

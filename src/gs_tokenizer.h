@@ -59,7 +59,8 @@ internal bool IsNewline(char C) { return (C == '\n' || C == '\r'); }
 
 internal bool IsAlpha(char C) {
   return ((C >= 'a' && C <= 'z') ||
-          (C >= 'A' && C <= 'Z'));
+          (C >= 'A' && C <= 'Z') ||
+          (C == '_'));
 };
 internal bool IsNumeric(char C) {
   return (C >= '0' && C <= '9');

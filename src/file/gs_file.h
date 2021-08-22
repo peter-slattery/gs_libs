@@ -9,7 +9,7 @@
 
 typedef enum
 {
-  FileError_Invalid,
+  FileError_NoError,
   
   FileError_AccessDenied,
   FileError_AlreadyExists,
@@ -29,6 +29,28 @@ typedef enum
   
   FileError_Count,
 } gs_file_error;
+
+global char* FileErrorStrings[] = {
+  "FileError_NoError",
+  
+  "FileError_AccessDenied",
+  "FileError_AlreadyExists",
+  "FileError_PipeBusy",
+  "FileError_SharingViolation",
+  
+  "FileError_InvalidHandle",
+  
+  "FileError_IOPending",
+  "FileError_OperationAborted",
+  
+  "FileError_FileNotFound",
+  
+  "FileError_NegativeSeek",
+  
+  "FileError_NoDataRead",
+  
+  "FileError_Count",
+};
 
 enum gs_file_handle_flag
 {
@@ -344,6 +366,7 @@ FileReadAllAndClose(gs_file_handler F, char* Path, gs_memory_arena* Arena, gs_fi
   GS_FILE_PROFILE_FUNC;
   gs_data Result = {0};
   
+  *ErrorOut = FileError_NoError;
   gs_file_handle Handle = FileOpen(F, Path, FileAccess_Read, FileCreate_OpenOnly, 0, ErrorOut);
   if (FileHandleIsValid(Handle))
   {

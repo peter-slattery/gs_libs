@@ -100,7 +100,7 @@ PLATFORM_FILE_OPEN(PFileOpenWin32)
   }
   else
   {
-    gs_file_error ErrResult = FileError_Invalid;
+    gs_file_error ErrResult = FileError_NoError;
     s32 Error = GetLastError();
     switch (Error)
     {
@@ -159,7 +159,7 @@ PLATFORM_FILE_CLOSE(PFileCloseWin32)
   s32 Error = GetLastError();
   if (!Result)
   {
-    gs_file_error ErrResult = FileError_Invalid;
+    gs_file_error ErrResult = FileError_NoError;
     switch (Error)
     {
       case ERROR_INVALID_HANDLE:
@@ -184,7 +184,7 @@ PLATFORM_GET_FILE_INFO(GetFileInfoWin32)
 internal gs_file_error
 Win32HandleReadWriteError ()
 {
-  gs_file_error Result = FileError_Invalid;
+  gs_file_error Result = FileError_NoError;
   
   int Error = GetLastError();
   switch (Error) 
@@ -290,7 +290,7 @@ PLATFORM_FILE_TELL(PFileTellWin32)
     {
       Result = (s64)MoveResult;
     } else {
-      gs_file_error ErrResult = FileError_Invalid;
+      gs_file_error ErrResult = FileError_NoError;
       switch(Error)
       {
         case ERROR_INVALID_HANDLE:
@@ -346,7 +346,7 @@ PLATFORM_FILE_SEEK(PFileSeekWin32)
       s32 DistMovedHigh = (s32)DistToMove[1];
       Result = (DistMovedHigh << 4 | DistMovedLow);
     } else {
-      gs_file_error ErrResult = FileError_Invalid;
+      gs_file_error ErrResult = FileError_NoError;
       switch(Error)
       {
         case ERROR_INVALID_HANDLE:
@@ -378,7 +378,7 @@ PLATFORM_FILE_DELETE(PFileDeleteWin32)
   s32 Error = GetLastError();
   if (!Result)
   {
-    gs_file_error ErrResult = FileError_Invalid;
+    gs_file_error ErrResult = FileError_NoError;
     switch (Error)
     {
       case ERROR_FILE_NOT_FOUND:
