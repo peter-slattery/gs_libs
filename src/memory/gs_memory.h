@@ -68,12 +68,16 @@ typedef struct gs_debug_allocations_list
 #define PLATFORM_ALLOC(name) void* name(u64 Size, u64* ResultSize, u8* UserData)
 typedef PLATFORM_ALLOC(platform_alloc);
 
+#define PLATFORM_REALLOC(name) void* name(u8* Base, u64 OldSize, u64 NewSize, u8* UserData)
+typedef PLATFORM_REALLOC(platform_realloc);
+
 #define PLATFORM_FREE(name) void name(void* Base, u64 Size, u8* UserData)
 typedef PLATFORM_FREE(platform_free);
 
 typedef struct gs_allocator
 {
   platform_alloc* PAlloc;
+  platform_realloc* PRealloc;
   platform_free*  PFree;
   u8* UserData;
   
@@ -84,6 +88,12 @@ PLATFORM_ALLOC(AllocNoOp)
 {
   GS_MEMORY_PROFILE_FUNC;
   if (ResultSize) *ResultSize = 0;
+  return 0;
+}
+
+PLATFORM_REALLOC(ReallocNoOp)
+{
+  GS_MEMORY_PROFILE_FUNC;
   return 0;
 }
 
@@ -156,6 +166,19 @@ Alloc_(gs_allocator A, u64 Size, gs_debug_loc Loc, char* ArenaName)
   return Result;
 }
 
+#define Realloc(a,b,os,ns) Realloc_((a),(u8*)(b),(os),(ns),DEBUG_LOC).Memory
+#define ReallocArray(a,b,t,oc,nc) (t*)Realloc_((a),(b),(sizeof(t)*oc),(sizeof(t)*nc),DEBUG_LOC).Memory
+internal gs_data
+Realloc_(gs_allocator A, u8* Base, u64 OldSize, u64 NewSize, gs_debug_loc Loc)
+{
+  GS_MEMORY_PROFILE_FUNC;
+  // TODO(PS): some way to track this alloc in debug
+  gs_data Result = {0};
+  Result.Memory = (u8*)A.PRealloc(Base, OldSize, NewSize, A.UserData);
+  Result.Size = NewSize;
+  return Result;
+}
+
 #define Free(a,b,s) Free_((a),(b),(s),DEBUG_LOC)
 #define FreeStruct(a,b,t) Free_((a),(u8*)(b),sizeof(t),DEBUG_LOC)
 #define FreeArray(a,b,t,c) Free_((a),(u8*)(b),sizeof(t)*(c),DEBUG_LOC)
@@ -169,16 +192,18 @@ Free_(gs_allocator A, u8* Base, u64 Size, gs_debug_loc Loc)
 
 // NOTE(PS): cast function and struct pointers to proper data types
 // for convenience
-#define AllocatorCreate(a,f,u) AllocatorCreate_((platform_alloc*)(a),(platform_free*)(f),(u8*)(u))
+#define AllocatorCreate(a,r,f,u) AllocatorCreate_((platform_alloc*)(a),(platform_realloc*)(r),(platform_free*)(f),(u8*)(u))
 internal gs_allocator
-AllocatorCreate_(platform_alloc* PAlloc, platform_free* PFree, u8* UserData)
+AllocatorCreate_(platform_alloc* PAlloc, platform_realloc* PRealloc, platform_free* PFree, u8* UserData)
 {
   gs_allocator Result = {
     .PAlloc = PAlloc,
+    .PRealloc = PRealloc,
     .PFree = PFree,
     .UserData = UserData,
   };
   if (!PAlloc) Result.PAlloc = AllocNoOp;
+  if (!PRealloc) Result.PRealloc = ReallocNoOp;
   if (!PFree)  Result.PFree  = FreeNoOp;
   
   // @DEBUG

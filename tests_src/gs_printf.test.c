@@ -7,14 +7,15 @@
 #define GS_PLATFORM_IMPLEMENTATION
 #define ASSERTS_ACTIVE 1
 #include "../src/gs_platform.h"
+
+#ifdef PLATFORM_WINDOWS
+# include <windows.h>
+#endif
+
 #include "../src/gs_types.h"
 #include "../src/gs_assert.h"
 #include "../src/memory/gs_memory.h"
 #include "../src/gs_printf.h"
-
-#ifdef GS_PLATFORM_WINDOWS
-# include <windows.h>
-#endif
 
 internal bool
 TestStringsEqual(char* A, char* B, u64 Len)

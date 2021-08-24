@@ -10,6 +10,12 @@ PLATFORM_ALLOC(AllocOSX)
 	return Result;
 }
 
+PLATFORM_REALLOC(ReallocOSX)
+{
+	u8* Result = (u8*)realloc(Base, Size);
+	return Result;
+}
+
 PLATFORM_FREE(FreeOSX)
 {
 	free(Base);
@@ -18,7 +24,7 @@ PLATFORM_FREE(FreeOSX)
 internal gs_allocator
 CreatePlatformAllocator()
 {
-	return AllocatorCreate(AllocOSX, FreeOSX, 0);
+	return AllocatorCreate(AllocOSX, ReallocOSX, FreeOSX, 0);
 }
 
 #endif

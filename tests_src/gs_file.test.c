@@ -22,7 +22,7 @@ int main(int ArgCount, char** Args)
   {
     gs_file_handler F = CreatePlatformFileHandler(A);
     
-    gs_file_error Error = FileError_Invalid;
+    gs_file_error Error = FileError_NoError;
     gs_file_handle Handle = {0};
     // Handle is invalid when ZII
     GlobalTest(!FileHandleIsValid(Handle));
@@ -51,7 +51,7 @@ int main(int ArgCount, char** Args)
     gs_file_handler F = CreatePlatformFileHandler(A);
     
     char* FileName = "create-delete-file.bar";
-    gs_file_error Error = FileError_Invalid;
+    gs_file_error Error = FileError_NoError;
     gs_file_handle Handle = {0};
     
     // Opening a non-existent file results in an invalid handle
@@ -78,7 +78,7 @@ int main(int ArgCount, char** Args)
   TestGroup("File Handler - Read")
   {
     gs_file_handler F = CreatePlatformFileHandler(A);
-    gs_file_error Error = FileError_Invalid;
+    gs_file_error Error = FileError_NoError;
     
     // Handle is valid once a file has been opened
     gs_file_handle Handle = FileOpen(F, "./test_dir/test_file.txt", FileAccess_Read, FileCreate_OpenOnly, 0, &Error);
@@ -113,7 +113,7 @@ int main(int ArgCount, char** Args)
   TestGroup("File Handler - Write")
   {
     gs_file_handler F = CreatePlatformFileHandler(A);
-    gs_file_error Error = FileError_Invalid;
+    gs_file_error Error = FileError_NoError;
     
     gs_file_handle Handle = FileOpen(F, "./test_dir/dump_file.dbin", FileAccess_Read | FileAccess_Write, FileCreate_OpenOrCreate, 0, &Error);
     

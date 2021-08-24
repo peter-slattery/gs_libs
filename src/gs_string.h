@@ -31,7 +31,7 @@ StringCreateConst(u8* Data, u64 Len)
 
 // NOTE(PS): creates a gs_string out of a string literal,
 // Len and Cap will not include the null terminator
-#define LitStr(s) (gs_string){ (u8*)(s), (sizeof(s)/sizeof(s[0])) - 1 }
+#define LitStr(s) (gs_string){ (u8*)(s), (sizeof(s)/sizeof(s[0])) - 1, (sizeof(s)/sizeof(s[0])) - 1 }
 
 // Index Of - Fwd / Bwd
 

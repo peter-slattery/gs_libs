@@ -19,6 +19,19 @@ int main(int ArgCount, char** Args)
   gs_allocator Al = CreatePlatformAllocator();
   gs_memory_arena Scratch = MemoryArenaCreate(128, 4, Al, 0, 0, "Test");
   
+  TestGroup("StringCreate & LitStr")
+  {
+    gs_string S0 = LitStr("Testing");
+    GlobalTest(S0.Len == S0.Cap);
+    GlobalTest(S0.Len == 7);
+    
+    char CharArray[] = "Testing";
+    u64 Len = sizeof(CharArray) / sizeof(CharArray[0]);
+    gs_string S1 = StringCreateConst((u8*)CharArray, Len);
+    GlobalTest(S1.Len == S1.Cap);
+    GlobalTest(S1.Len == Len);
+  }
+  
   TestGroup("Index Of Char")
   {
     gs_string S0 = LitStr("Test2ing 1234");

@@ -143,6 +143,11 @@ PLATFORM_FILE_OPEN(PFileOpenWin32)
         ErrResult = FileError_SharingViolation;
       } break;
       
+      case ERROR_PATH_NOT_FOUND:
+      {
+        ErrResult = FileError_PathNotFound;
+      } break;
+      
       InvalidDefaultCase;
     }
     

@@ -30,13 +30,29 @@ int main(int ArgCount, char** Args)
   {
     gs_allocator A = CreatePlatformAllocator();
     
-    u8* Data = AllocArray(A, u8, 4096, "root");
-    for (int i = 0; i < 4096; i++) Data[i] = (i % MaxU8);
+    u64 Size0 = 4096;
+    u8* Data = AllocArray(A, u8, Size0, "root");
+    for (int i = 0; i < Size0; i++) Data[i] = (i % MaxU8);
     bool Success = true;
-    for (int i = 0; i < 4096; i++) Success &= Data[i] == (i % MaxU8);
+    for (int i = 0; i < Size0; i++) Success &= Data[i] == (i % MaxU8);
     GlobalTest(Success);
     
-    FreeArray(A, Data, u8, 4096);
+    u64 Size1 = 4096 * 2;
+    Data = ReallocArray(A, Data, u8, Size0, Size1);
+    
+    // NOTE(PS): these should still equal their original values
+    Success = true;
+    for (u64 i = 0; i < Size0; i++) Success &= Data[i] == (i % MaxU8);
+    GlobalTest(Success);
+    
+    // NOTE(PS): we should be able to set values for all
+    // new indices as well
+    for (u64 i = 0; i < Size1; i++) Data[i] = (i % MaxU8);
+    Success = true;
+    for (u64 i = 0; i < Size1; i++) Success &= Data[i] == (i % MaxU8);
+    GlobalTest(Success);
+    
+    FreeArray(A, Data, u8, Size1);
     GlobalTest(true); // TODO(PS): How do we test free?
   }
   

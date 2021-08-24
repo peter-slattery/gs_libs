@@ -12,6 +12,16 @@ PLATFORM_ALLOC(AllocWin32)
   return Result;
 }
 
+PLATFORM_REALLOC(ReallocWin32)
+{
+  u8* Result = (u8*)VirtualAlloc(NULL, NewSize,
+                                 MEM_COMMIT | MEM_RESERVE,
+                                 PAGE_EXECUTE_READWRITE);
+  CopyMemoryTo(Base, Result, OldSize);
+  VirtualFree(Base, 0, MEM_RELEASE);
+  return Result;
+}
+
 PLATFORM_FREE(FreeWin32)
 {
   VirtualFree(Base, 0, MEM_RELEASE);
@@ -20,7 +30,7 @@ PLATFORM_FREE(FreeWin32)
 internal gs_allocator 
 CreatePlatformAllocator()
 {
-  return AllocatorCreate(AllocWin32, FreeWin32, 0);
+  return AllocatorCreate(AllocWin32, ReallocWin32, FreeWin32, 0);
 }
 
 #endif //GS_MEMORY_WIN32_H

@@ -22,6 +22,7 @@ typedef enum
   FileError_OperationAborted,
   
   FileError_FileNotFound,
+  FileError_PathNotFound,
   
   FileError_NegativeSeek,
   
