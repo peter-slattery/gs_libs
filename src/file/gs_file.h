@@ -32,25 +32,25 @@ typedef enum
 } gs_file_error;
 
 global char* FileErrorStrings[] = {
-  "FileError_NoError",
+  (char*)"FileError_NoError",
   
-  "FileError_AccessDenied",
-  "FileError_AlreadyExists",
-  "FileError_PipeBusy",
-  "FileError_SharingViolation",
+  (char*)"FileError_AccessDenied",
+  (char*)"FileError_AlreadyExists",
+  (char*)"FileError_PipeBusy",
+  (char*)"FileError_SharingViolation",
   
-  "FileError_InvalidHandle",
+  (char*)"FileError_InvalidHandle",
   
-  "FileError_IOPending",
-  "FileError_OperationAborted",
+  (char*)"FileError_IOPending",
+  (char*)"FileError_OperationAborted",
   
-  "FileError_FileNotFound",
+  (char*)"FileError_FileNotFound",
   
-  "FileError_NegativeSeek",
+  (char*)"FileError_NegativeSeek",
   
-  "FileError_NoDataRead",
+  (char*)"FileError_NoDataRead",
   
-  "FileError_Count",
+  (char*)"FileError_Count",
 };
 
 enum gs_file_handle_flag
@@ -213,19 +213,19 @@ FileHandlerCreate_(gs_allocator Allocator,
   gs_memory_arena* Arena = AllocStruct(Allocator, gs_memory_arena, "root");
   *Arena = MemoryArenaCreate(4096, 8, Allocator, 0, 0, (char*)"File Handler Arena");
   
-  gs_file_handler Result = {
-    .PGetFileInfo = FILE_HANDLER_SAFE_PROC(PGetFileInfo),
-    .PFileOpen    = FILE_HANDLER_SAFE_PROC(PFileOpen),
-    .PFileClose   = FILE_HANDLER_SAFE_PROC(PFileClose),
-    .PFileRead    = FILE_HANDLER_SAFE_PROC(PFileRead),
-    .PFileWrite   = FILE_HANDLER_SAFE_PROC(PFileWrite),
-    .PFileTell    = FILE_HANDLER_SAFE_PROC(PFileTell),
-    .PFileSeek    = FILE_HANDLER_SAFE_PROC(PFileSeek),
-    .PFileDelete  = FILE_HANDLER_SAFE_PROC(PFileDelete),
-    .UserData     = UserData,
-    .Arena        = Arena,
-    .MaxPath      = MaxPath,
-  };
+  gs_file_handler Result = {};
+  Result.PGetFileInfo = FILE_HANDLER_SAFE_PROC(PGetFileInfo);
+  Result.PFileOpen    = FILE_HANDLER_SAFE_PROC(PFileOpen);
+  Result.PFileClose   = FILE_HANDLER_SAFE_PROC(PFileClose);
+  Result.PFileRead    = FILE_HANDLER_SAFE_PROC(PFileRead);
+  Result.PFileWrite   = FILE_HANDLER_SAFE_PROC(PFileWrite);
+  Result.PFileTell    = FILE_HANDLER_SAFE_PROC(PFileTell);
+  Result.PFileSeek    = FILE_HANDLER_SAFE_PROC(PFileSeek);
+  Result.PFileDelete  = FILE_HANDLER_SAFE_PROC(PFileDelete);
+  Result.UserData     = UserData;
+  Result.Arena        = Arena;
+  Result.MaxPath      = MaxPath;
+  
   return Result;
 }
 

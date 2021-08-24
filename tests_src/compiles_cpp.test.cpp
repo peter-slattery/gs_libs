@@ -22,6 +22,7 @@
 #include "../src/file/gs_file.h"
 #include "../src/thread/gs_thread.h"
 #include "../src/time/gs_time.h"
+
 #include "../src/gs_debug_break.h"
 #include "../src/gs_math.h"
 #include "../src/gs_printf.h"
@@ -30,6 +31,10 @@
 #include "../src/gfx/gs_gfx.h"
 
 #include "../src/gs_profiler.c"
+
+#include "../src/gs_string.h"
+#include "../src/gs_stretchy_buffer.h"
+#include "../src/gs_tokenizer.h"
 
 int main(int ArgCount, char** Args)
 {

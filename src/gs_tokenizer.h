@@ -13,12 +13,12 @@ typedef enum {
 } gs_char_type;
 
 global char* CharTypeStrings[] = {
-  "CharType_Invalid",
+  (char*)"CharType_Invalid",
   
-  "CharType_Alpha",
-  "CharType_Numeric",
-  "CharType_AlphaNum",
-  "CharType_Symbol",
+  (char*)"CharType_Alpha",
+  (char*)"CharType_Numeric",
+  (char*)"CharType_AlphaNum",
+  (char*)"CharType_Symbol",
 };
 
 typedef struct {

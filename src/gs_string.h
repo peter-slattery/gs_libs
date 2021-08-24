@@ -266,7 +266,7 @@ PushStringF(gs_memory_arena* A, u64 Cap, char* Format, ...)
   gs_string Result = {};
   Result.Cap = R.Length;
   Result.Len = R.Length;
-  Result.Data = R.String;
+  Result.Data = (u8*)R.Str;
   
   return Result;
 }

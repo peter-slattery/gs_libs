@@ -376,14 +376,13 @@ MemoryArenaCreate(u64 ChunkSize, u64 Alignment, gs_allocator Allocator, gs_memor
 {
   GS_MEMORY_PROFILE_FUNC;
   
-  gs_memory_arena Result = {
-    .ChunkSize = ChunkSize,
-    .Alignment = Alignment,
-    .Allocator = Allocator,
-    .Parent = Parent,
-    .UserData = UserData,
-    .ArenaName = Name,
-  };
+  gs_memory_arena Result = {};
+  Result.ChunkSize = ChunkSize;
+  Result.Alignment = Alignment;
+  Result.Allocator = Allocator;
+  Result.Parent = Parent;
+  Result.UserData = UserData;
+  Result.ArenaName = Name;
   return Result;
 }
 

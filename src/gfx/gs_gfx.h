@@ -565,11 +565,11 @@ VBBCreate(u32 VertexDataCountMax, u32 IndexDataCountMax, gs_gfx_vertex_data_orde
 {
   r32* VertexData = PushArray(Arena, r32, VertexDataCountMax);
   u32* IndexData = PushArray(Arena, u32, IndexDataCountMax);
-  gs_gfx_vertex_buffer_builder Result = {
-    .VertexDataCountMax = VertexDataCountMax,
-    .IndexDataCountMax = IndexDataCountMax,
-    .ModelDesc = GfxModelDescConstruct(VertexData, 0, VertDataOrder, IndexData, 0)
-  };
+  gs_gfx_vertex_buffer_builder Result = {};
+  Result.VertexDataCountMax = VertexDataCountMax;
+  Result.IndexDataCountMax = IndexDataCountMax;
+  Result.ModelDesc = GfxModelDescConstruct(VertexData, 0, VertDataOrder, IndexData, 0);
+  
   return Result;
 }
 

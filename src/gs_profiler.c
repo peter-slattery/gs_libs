@@ -88,13 +88,12 @@ EndScope(gs_profiler_scope* Scope)
 internal gs_profiler
 ProfilerCreate(gs_memory_arena A, u64 FramesCount, u64 ScopesCount, gs_thread_manager* ThreadManager, gs_time_handler TimeHandler)
 {
-  gs_profiler Result = {
-    .Arena = A,
-    .ThreadManager = ThreadManager,
-    .TimeHandler = TimeHandler,
-    .FramesCount = FramesCount,
-    .Frames = PushArray(&A, gs_profiler_frame, FramesCount),
-  };
+  gs_profiler Result = {};
+  Result.Arena = A;
+  Result.ThreadManager = ThreadManager;
+  Result.TimeHandler = TimeHandler;
+  Result.FramesCount = FramesCount;
+  Result.Frames = PushArray(&A, gs_profiler_frame, FramesCount);
   
   u64 ThreadCountMax = Max(1, ThreadManager->ThreadCountMax);
   
@@ -108,10 +107,10 @@ ProfilerCreate(gs_memory_arena A, u64 FramesCount, u64 ScopesCount, gs_thread_ma
     Frame->ThreadScopes = Threads + (i * ThreadCountMax);;
     for (u64 j = 0; j < Frame->ThreadScopesCount; j++)
     {
-      Frame->ThreadScopes[j] = (gs_profiler_scope_array){
-        .ScopesCount = ScopesCount,
-        .Scopes = Scopes + ((i * ThreadCountMax) * (j * ScopesCount)),
-      };
+      gs_profiler_scope_array A = {};
+      A.ScopesCount = ScopesCount;
+      A.Scopes = Scopes + ((i * ThreadCountMax) * (j * ScopesCount));
+      Frame->ThreadScopes[j] = A;
     }
   }
   
