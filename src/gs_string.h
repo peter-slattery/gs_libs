@@ -231,14 +231,21 @@ StringCopy(gs_string Src, gs_string* Dest)
 }
 
 internal void
-StringCopyCharArray(char* Src, gs_string* Dest)
+StringCopyCharArrayLen(char* Src, u64 Len, gs_string* Dest)
 {
   u64 i = 0;
-  for (; i < Dest->Cap && Src[i] != 0; i++)
+  for (; i < Min(Dest->Cap, Len) && Src[i] != 0; i++)
   {
     Dest->Data[i] = Src[i];
   }
   Dest->Len = i;
+}
+
+internal void
+StringCopyCharArray(char* Src, gs_string* Dest)
+{
+  u64 Len = CStringLength(Src);
+  StringCopyCharArrayLen(Src, Len, Dest);
 }
 
 #ifdef GS_MEMORY_H

@@ -11,6 +11,7 @@
 #include "../src/gs_assert.h"
 #include "../src/memory/gs_memory.h"
 
+#include "../src/gs_string.h"
 #include "../src/gs_tokenizer.h"
 
 int main(int ArgCount, char** Args)

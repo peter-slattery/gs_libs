@@ -4,7 +4,10 @@
 #define GS_MATH_H
 
 #include <math.h>
-#include <intrin.h>
+
+#ifdef _MSC_VER
+# include <intrin.h>
+#endif
 
 #if !defined(GS_MATH_PROFILE_FUNC)
 # define GS_MATH_PROFILE_FUNC
@@ -545,7 +548,7 @@ SqrtR32(r32 V)
 {
   GS_MATH_PROFILE_FUNC;
   
-  return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(V)));
+  return sqrtf(V);
 }
 internal u32
 SqrtU32(u32 V)

@@ -19,6 +19,12 @@ int main(int ArgCount, char** Args)
   gs_allocator Al = CreatePlatformAllocator();
   gs_memory_arena Scratch = MemoryArenaCreate(128, 4, Al, 0, 0, "Test");
   
+  TestGroup("C String Length")
+  {
+    char* CStr = "123456789012";
+    GlobalTest(CStringLength(CStr) == 12);
+  }
+  
   TestGroup("StringCreate & LitStr")
   {
     gs_string S0 = LitStr("Testing");

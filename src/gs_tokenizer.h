@@ -22,8 +22,7 @@ global char* CharTypeStrings[] = {
 };
 
 typedef struct {
-  char* Data;
-  u64 Len;
+  gs_string Str;
   gs_char_type Type;
   
   u64 Col;
@@ -50,6 +49,15 @@ typedef struct {
   u64 Row;
   u64 Col;
 } gs_tokenizer;
+
+typedef struct {
+  gs_token_sll* Root;
+  gs_token_sll* Head;
+  
+  gs_token_sll* SLLAt;
+  gs_token At;
+  gs_token Next;
+} gs_token_iter;
 
 //
 // Basic Character Identification
@@ -111,8 +119,7 @@ internal void
 TokenizerPushToken(gs_tokenizer* T, char* Start, char* End, gs_char_type Type)
 {
   gs_token Token = {};
-  Token.Data = Start;
-  Token.Len = (u64)(End - Start);
+  Token.Str = StringCreateConst((u8*)Start, (u64)(End - Start));
   Token.Type = Type;
   
   // NOTE(PS): Tokens get Pushed after the tokenizer has
@@ -121,7 +128,7 @@ TokenizerPushToken(gs_tokenizer* T, char* Start, char* End, gs_char_type Type)
   // is at the end of the Token, hence the subtraction
   // of Token.Len
   Token.Row = T->Row;
-  Token.Col = T->Col - Token.Len;
+  Token.Col = T->Col - Token.Str.Len;
   
   gs_token_sll* TokenEle = PushStruct(T->Arena, gs_token_sll);
   TokenEle->T = Token;
@@ -140,7 +147,7 @@ internal void
 TokenizerAdvanceChar(gs_tokenizer* T)
 {
   if (TokenizerAtEnd(T)) return;
-  if (IsNewline(*T->CharAt)) {
+  if (T->CharAt[0] == '\n') {
     T->Row++;
     T->Col = 0;
   }
@@ -194,13 +201,21 @@ TokenizerAdvanceToken(gs_tokenizer* T)
   TokenizerPushToken(T, TokenStart, TokenEnd, TokenType);
 }
 
-internal void
+internal gs_token_iter
 TokenizerTokenizeAll(gs_tokenizer* T)
 {
   while (!TokenizerAtEnd(T)) 
   {
     TokenizerAdvanceToken(T);
   }
+  
+  gs_token_iter Result = {0};
+  Result.Root = T->TokensRoot;
+  Result.Head = T->TokensHead;
+  Result.SLLAt = Result.Root;
+  Result.Next = Result.Root->T;
+  
+  return Result;
 }
 
 //
@@ -209,10 +224,10 @@ TokenizerTokenizeAll(gs_tokenizer* T)
 internal bool
 TokenEqualsCStr(gs_token T, char* Str, u64 StrLen)
 {
-  if (T.Len != StrLen) return false;
+  if (T.Str.Len != StrLen) return false;
   for (u64 i = 0; i < StrLen; i++)
   {
-    if (T.Data[i] != Str[i]) return false;
+    if (T.Str.Data[i] != Str[i]) return false;
   }
   return true;
 }
@@ -224,4 +239,54 @@ TokenEquals(gs_token T, char* Str)
   return TokenEqualsCStr(T, Str, StrLen);
 }
 
+//
+// Token Iter
+
+internal bool
+TokenIterCanAdvance(gs_token_iter* I)
+{
+  return (I->SLLAt->Next != 0);
+}
+
+internal gs_token
+TokenIterAdvance(gs_token_iter* I)
+{
+  I->At = I->Next;
+  if (TokenIterCanAdvance(I))
+  {
+    I->SLLAt = I->SLLAt->Next;
+    I->Next = I->SLLAt->T;
+  }
+  return I->At;
+}
+
+internal bool
+TokenIterPeek(gs_token_iter* I, char* Match)
+{
+  if (TokenIterCanAdvance(I))
+  {
+    if (TokenEquals(I->Next, Match))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+internal bool
+TokenIterMatchNext(gs_token_iter* I, char* Match)
+{
+  bool Result = TokenIterPeek(I, Match);
+  if (Result) TokenIterAdvance(I);
+  return Result;
+}
+
+internal gs_string
+TokenConcat(gs_token Start, gs_token End)
+{
+  gs_string Result = {};
+  Result.Data = Start.Str.Data;
+  Result.Len = (End.Str.Data + End.Str.Len) - Result.Data;
+  return Result;
+}
 #endif //GS_TOKENIZER_H

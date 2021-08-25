@@ -13,7 +13,9 @@
 #define PLATFORM_IOS 0
 #define PLATFORM_XBOX 0
 #define PLATFORM_PS 0
-#define PLAYFORM_SWITCH 0
+#define PLATFORM_SWITCH 0
+
+#define PLATFORM_EMSCRIPTEN 0
 
 #if defined(_MSC_VER)
 # undef COMPILER_MSVC
@@ -44,6 +46,12 @@
 # undef PLATFORM_ANDROID
 # define PLATFORM_ANDROID 1
 #endif
+
+#if defined(__EMSCRIPTEN__)
+# undef PLATFORM_EMSCRIPTEN
+# define PLATFORM_EMSCRIPTEN 1
+#endif
+
 
 // TODO(PS): ios, xbox, playstation, switch
 #endif //GS_PLATFORM_H

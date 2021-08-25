@@ -523,6 +523,8 @@ internal gs_allocator CreatePlatformAllocator();
 #  include "./gs_memory_osx.h"
 # elif PLATFORM_LINUX
 #  include "./gs_memory_linux.h"
+# elif PLATFORM_EMSCRIPTEN
+#  include "./gs_memory_emcc.h"
 # endif
 
 #endif

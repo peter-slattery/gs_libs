@@ -29,22 +29,27 @@ DEBUG_BREAK()
 #elif defined(__aarch64__)
 DEBUG_BREAK()
 {
-    __asm__ volatile(".inst 0xd4200000");
+  __asm__ volatile(".inst 0xd4200000");
 }
 #elif defined(__powerpc__)
 DEBUG_BREAK()
 {
-    __asm__ volatile(".4byte 0x7d821008");
+  __asm__ volatile(".4byte 0x7d821008");
 }
 #elif defined(__riscv)
 DEBUG_BREAK()
 {
-    __asm__ volatile(".4byte 0x00100073");
+  __asm__ volatile(".4byte 0x00100073");
+}
+#elif defined(__EMSCRIPTEN__)
+DEBUG_BREAK()
+{
+  // TODO(PS): 
 }
 #else
 DEBUG_BREAK()
 {
-    raise(SIGTRAP);
+  raise(SIGTRAP);
 }
 #endif
 
