@@ -213,4 +213,23 @@ RoundUpTo64(u64 Value, u64 Alignment)
 #define SLLPush(ele, root, head) (head)->Next = (ele); (head)=(ele); (head)->Next=0
 #define SLLPushOrInit(ele, root, head) if (!(root)) { (root)=(ele); (head)=(ele); } SLLPush(ele, root, head)
 
+// Endian Swaps
+
+#define EndianSwapU16(v) (((v) & 0xFF00) >> 8 | \
+((v) & 0x00FF) << 8)
+
+#define EndianSwapU32(v) (((v) & 0xFF000000) >> 24 | \
+((v) & 0x00FF0000) >> 8  | \
+((v) & 0x0000FF00) << 8  | \
+((v) & 0x000000FF) << 24)
+
+#define EndianSwapU64(v) (((v) & 0xFF00000000000000) >> 56 | \
+((v) & 0x00FF000000000000) >> 40 | \
+((v) & 0x0000FF0000000000) >> 24 | \
+((v) & 0x000000FF00000000) >> 8  | \
+((v) & 0x00000000FF000000) << 8  | \
+((v) & 0x0000000000FF0000) << 24 | \
+((v) & 0x000000000000FF00) << 40 | \
+((v) & 0x00000000000000FF) << 56)
+
 #endif //GS_TYPES_H

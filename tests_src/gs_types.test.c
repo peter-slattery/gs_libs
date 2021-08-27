@@ -75,4 +75,22 @@ int main(int ArgCount, char** Args)
     GlobalTest(!CStringsEqual(StringA, StringC));
     GlobalTest(!CStringsEqual(StringC, StringA));
   }
+  
+  TestGroup("Endian Swaps")
+  {
+    u16 U16In  = 0xABCD;
+    u16 U16Out = 0xCDAB;
+    u16 U16Res = EndianSwapU16(U16In);
+    GlobalTest(U16Out == U16Res);
+    
+    u32 U32In  = 0x89ABCDEF;
+    u32 U32Out = 0xEFCDAB89;
+    u32 U32Res = EndianSwapU32(U32In);
+    GlobalTest(U32Out == U32Res);
+    
+    u64 U64In  = 0xF123456789ABCDEF;
+    u64 U64Out = 0xEFCDAB89674523F1;
+    u64 U64Res = EndianSwapU64(U64In);
+    GlobalTest(U64Out == U64Res);
+  }
 }
