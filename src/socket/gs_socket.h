@@ -25,7 +25,8 @@ typedef struct
   u8* UserData;
 } gs_socket_handler;
 
-gs_socket_handler CreatePlatformSocketHandler ();
+
+gs_socket_handler CreatePlatformSocketHandler (gs_allocator A);
 void CloseSocket(s32 SocketFileDesc);
 
 gs_socket_fd
@@ -68,6 +69,52 @@ CreateSocket(struct addrinfo Hints, char* Node, char* Port)
     {
       CloseSocket(SockFD);
       printf("Error: bind\n");
+      continue;
+    }
+    
+    break;
+  }
+  
+  if (P == NULL)
+  {
+    printf("Error: server: failed to bind\n");
+    return Result;
+  }
+  
+  freeaddrinfo(ServInfo);
+  
+  Result.FD = SockFD;
+  return Result;
+}
+
+gs_socket_fd
+CreateSocketClient(struct addrinfo Hints, char* Node, char* Port)
+{
+  gs_socket_fd Result = {0};
+  
+  struct addrinfo* ServInfo;
+  s32 RV = getaddrinfo(Node, Port, &Hints, &ServInfo);
+  if (RV != 0) {
+    printf("Error: getaddrinfo: %s\n", gai_strerror(RV));
+    return Result;
+  }
+  
+  struct addrinfo* P = 0;
+  s32 SockFD = 0;
+  for (P = ServInfo; P != NULL; P = P->ai_next) 
+  {
+    SockFD = socket(P->ai_family, P->ai_socktype, P->ai_protocol);
+    if (SockFD == -1)
+    {
+      printf("Error: socket\n");
+      continue;
+    }
+    
+    RV = connect(SockFD, P->ai_addr, P->ai_addrlen);
+    if (RV == -1)
+    {
+      CloseSocket(SockFD);
+      printf("Error: connect\n");
       continue;
     }
     
