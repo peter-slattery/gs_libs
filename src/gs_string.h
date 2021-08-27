@@ -33,6 +33,8 @@ StringCreateConst(u8* Data, u64 Len)
 // Len and Cap will not include the null terminator
 #define LitStr(s) (gs_string){ (u8*)(s), (sizeof(s)/sizeof(s[0])) - 1, (sizeof(s)/sizeof(s[0])) - 1 }
 
+#define StrExpand(s) (u32)(s).Len, (char*)(s).Data
+
 // Index Of - Fwd / Bwd
 
 internal s64
@@ -248,7 +250,262 @@ StringCopyCharArray(char* Src, gs_string* Dest)
   StringCopyCharArrayLen(Src, Len, Dest);
 }
 
+//
+// Append String
+//
+
+internal u64
+StringAppend(gs_string* Dest, u8* A, u64 ALen)
+{
+  u64 i = 0;
+  for (; i < Min(Dest->Cap - Dest->Len, ALen); i++)
+  {
+    Dest->Data[Dest->Len + i] = A[i];
+  }
+  Dest->Len += i;
+  return i;
+}
+internal u64
+StringAppendString(gs_string* Dest, gs_string A)
+{
+  return StringAppend(Dest, A.Data, A.Len);
+}
+internal u64
+StringAppendCString(gs_string* Dest, char* A)
+{
+  u64 Len = CStringLength(A);
+  return StringAppend(Dest, (u8*)A, Len);
+}
+
+//
+// Encodings
+//
+
+// Bytes To Binary, Octal, Decimal, Hex
+gs_string DigitsBinary   = LitStr("01");
+gs_string DigitsOctal    = LitStr("01234567");
+gs_string DigitsDecimal  = LitStr("0123456789");
+gs_string DigitsHex      = LitStr("0123456789ABCDEF");
+gs_string DigitsHexLower = LitStr("0123456789abcdef");
+
+internal char
+GetCharFromByte(u8 Byte, gs_string Digits)
+{
+  Assert(Byte < Digits.Len);
+  char Result = Digits.Data[Byte];
+  return Result;
+}
+
+internal void
+ToStringU32(u32 Int, gs_string Digits, gs_string* Dest)
+{
+  u64 Start = Dest->Len;
+  u32 Remaining = Int;
+  while (Dest->Len < Dest->Cap && Remaining > 0)
+  {
+    u8 Byte = (u8)(Remaining % Digits.Len);
+    Dest->Data[Dest->Len++] = GetCharFromByte(Byte, Digits);
+    Remaining = Remaining / Digits.Len;
+  }
+  
+  gs_string Range = {};
+  Range.Data = Dest->Data + Start;
+  Range.Len  = Dest->Len - Start;
+  StringReverse(Range);
+}
+internal void
+ToStringU64(u64 Int, gs_string Digits, gs_string* Dest)
+{
+  u64 Start = Dest->Len;
+  u64 Remaining = Int;
+  while (Dest->Len < Dest->Cap && Remaining > 0)
+  {
+    u8 Byte = (u8)(Remaining % Digits.Len);
+    Dest->Data[Dest->Len++] = GetCharFromByte(Byte, Digits);
+    Remaining = Remaining / Digits.Len;
+  }
+  
+  gs_string Range = {};
+  Range.Data = Dest->Data + Start;
+  Range.Len  = Dest->Len - Start;
+  StringReverse(Range);
+}
+
+
+// Base-64
+// Source: http://web.mit.edu/freebsd/head/contrib/wpa/src/utils/base64.c
+
+global char EncodingTable_Base64[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+global u8 DecodingTable_Base64[256] = {
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,62,0x80,0x80,0x80,63,52,53,
+  54,55,56,57,58,59,60,61,0x80,0x80,
+  0x80,0,0x80,0x80,0x80,0,1,2,3,4,
+  5,6,7,8,9,10,11,12,13,14,
+  15,16,17,18,19,20,21,22,23,24,
+  25,0x80,0x80,0x80,0x80,0x80,0x80,26,27,28,
+  29,30,31,32,33,34,35,36,37,38,
+  39,40,41,42,43,44,45,46,47,48,
+  49,50,51,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+  0x80,0x80,0x80,0x80,0x80,0x80,
+};
+
+internal u64
+Encode_Base64OutputLen(u64 Len)
+{
+  u64 OutputLen = Len * 4 / 3 + 4; // 3-byte blocks to 4-byte
+  OutputLen += OutputLen / 72; // line feeds
+  OutputLen++; // null termination
+  if (OutputLen < Len) return 0; // int overflow
+  return OutputLen;
+}
+
+internal u64
+Encode_Base64(u8* Data, u64 Len, u8* Output, u64 OutputCap)
+{
+  Assert(Output);
+  Assert(OutputCap >= Encode_Base64OutputLen(Len));
+  
+  u8* End = Data + Len;
+  u8* In = Data;
+  u8* Pos = Output;
+  u64 LineLen = 0;
+  while (End - In >= 3)
+  {
+    *Pos++ = EncodingTable_Base64[In[0] >> 2];
+    *Pos++ = EncodingTable_Base64[((In[0] & 0x03) << 4) | (In[1] >> 4)];
+    *Pos++ = EncodingTable_Base64[((In[1] & 0x0f) << 2) | (In[2] >> 6)];
+    *Pos++ = EncodingTable_Base64[In[2] & 0x3f];
+    
+    In += 3;
+    LineLen += 4;
+    if (LineLen >= 72) {
+      *Pos++ = '\n';
+      LineLen = 0;
+    }
+  }
+  
+  if (End - In)
+  {
+    *Pos++ = EncodingTable_Base64[In[0] >> 2];
+    if (End - In == 1) {
+      *Pos++ = EncodingTable_Base64[(In[0] & 0x03) << 4];
+    } else {
+      *Pos++ = EncodingTable_Base64[((In[0] & 0x03) << 4) | (In[1] >> 4)];
+      *Pos++ = EncodingTable_Base64[((In[1] & 0x0f) << 2) | (In[2] >> 6)];
+    }
+    *Pos++ = '=';
+    LineLen += 4;
+  }
+  
+  //if (LineLen) *Pos++ = '\n';
+  *Pos = '\0';
+  
+  return (Pos - Output);
+}
+
+internal u64
+Decode_Base64OutputLen(u8* Data, u64 Len)
+{
+  u64 Result = 0;
+  u64 Count = 0;
+  for (u64 i = 0; i < Len; i++)
+  {
+    if (DecodingTable_Base64[Data[i]] != 0x80) Count += 1;
+  }
+  Result = Count / 4 * 3;
+  return Result;
+}
+
+internal u64
+Decode_Base64(u8* Data, u64 Len, u8* Output, u64 OutputCap)
+{
+  Assert(Output);
+  Assert(Decode_Base64OutputLen(Data, Len) >= OutputCap);
+  
+  u8* Pos = Output;
+  u8 Block[4];
+  u64 Count = 0;
+  u64 Pad = 0;
+  u8 Tmp = 0;
+  for (u64 i = 0; i < Len; i++) 
+  {
+    Tmp = DecodingTable_Base64[Data[i]];
+    if (Tmp == 0x80) continue;
+    
+    if (Data[i] == '=') Pad++;
+    
+    Block[Count++] = Tmp;
+    if (Count == 4)
+    {
+      *Pos++ = (Block[0] << 2) | (Block[1] >> 4);
+      *Pos++ = (Block[1] << 4) | (Block[2] >> 2);
+      *Pos++ = (Block[2] << 6) | (Block[3]);
+      Count = 0;
+      if (Pad) 
+      {
+        if      (Pad == 1) { Pos -= 1; }
+        else if (Pad == 2) { Pos -= 2; }
+        else { 
+          // invalid padding
+          return 0;
+        }
+        break;
+      }
+    }
+  }
+  return (Pos - Output);
+}
+
 #ifdef GS_MEMORY_H
+
+internal u8*
+Encode_Base64Alloc(u8* Data, u64 Len, u64* OutputLen, gs_memory_arena* Arena)
+{
+  u64 AllocLen = Encode_Base64OutputLen(Len);
+  u8* Result = PushSize(Arena, AllocLen).Memory;
+  *OutputLen = Encode_Base64(Data, Len, Result, AllocLen);
+  return Result;
+}
+internal gs_string
+EncodeStr_Base64Alloc(gs_string Str, gs_memory_arena* Arena)
+{
+  gs_string Result = {};
+  Result.Data = Encode_Base64Alloc(Str.Data, Str.Len, &Result.Len, Arena);
+  return Result;
+}
+
+internal u8*
+Decode_Base64Alloc(u8* Data, u64 Len, u64* OutputLen, gs_memory_arena* Arena)
+{
+  u64 AllocLen = Decode_Base64OutputLen(Data, Len);
+  u8* Result = PushSize(Arena, AllocLen).Memory;
+  *OutputLen = Decode_Base64(Data, Len, Result, AllocLen);
+  return Result;
+}
+internal gs_string
+DecodeStr_Base64Alloc(gs_string Str, gs_memory_arena* Arena)
+{
+  gs_string Result = {};
+  Result.Data = Decode_Base64Alloc(Str.Data, Str.Len, &Result.Len, Arena);
+  return Result;
+}
 
 internal gs_string
 PushString(gs_memory_arena* A, u64 Cap)

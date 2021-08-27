@@ -11,6 +11,7 @@
 #include "../src/gs_assert.h"
 #include "../src/memory/gs_memory.h"
 #include "../src/gs_string.h"
+#include "../src/gs_hash.h"
 
 int main(int ArgCount, char** Args)
 {
@@ -140,5 +141,95 @@ int main(int ArgCount, char** Args)
     StringCopy(S0, &S1);
     
     GlobalTest(StringEqualsString(S0, S1));
+  }
+  
+  MemoryArenaClear(&Scratch);
+  TestGroup("Encoding - Base64")
+  {
+    // strings to encode
+    gs_string TInStr[] = {
+      LitStr("Foobar\nTest"),
+      LitStr("heytherebuddyhow'sitgoing?"),
+      LitStr("heytherebuddyhow'sitgoing?Thisqerqweuro82491845h23@#$%@#$%23452345\n523452345123412342\n412341234\ns\ndfs\nf\nsdf"),
+    };
+    
+    // parallel array to TInStr,
+    // containing the encoded versions of the string at the same index
+    gs_string TOutStr[] = {
+      LitStr("Rm9vYmFyClRlc3Q="),
+      LitStr("aGV5dGhlcmVidWRkeWhvdydzaXRnb2luZz8="),
+      LitStr("aGV5dGhlcmVidWRkeWhvdydzaXRnb2luZz9UaGlzcWVycXdldXJvODI0OTE4NDVoMjNAIyQl\nQCMkJTIzNDUyMzQ1CjUyMzQ1MjM0NTEyMzQxMjM0Mgo0MTIzNDEyMzQKcwpkZnMKZgpzZGY="),
+    };
+    
+    u64 TCount = sizeof(TOutStr)/sizeof(TOutStr[0]);
+    
+    for (u64 i = 0; i < TCount; i++)
+    {
+      gs_string In = TInStr[i];
+      gs_string Out = TOutStr[i];
+      
+      gs_string EncRes = {};
+      EncRes.Data = Encode_Base64Alloc(In.Data, In.Len, 
+                                       &EncRes.Len, &Scratch);
+      GlobalTest(EncRes.Len == Out.Len);
+      GlobalTest(StringEqualsString(EncRes, Out));
+      
+      gs_string DecRes = {};
+      DecRes.Data = Decode_Base64Alloc(Out.Data, Out.Len, 
+                                       &DecRes.Len, &Scratch);
+      GlobalTest(DecRes.Len == In.Len);
+      GlobalTest(StringEqualsString(DecRes, In));
+      
+      gs_string ReEncRes = {};
+      ReEncRes.Data = Encode_Base64Alloc(DecRes.Data, DecRes.Len,
+                                         &ReEncRes.Len, &Scratch);
+      GlobalTest(Out.Len == ReEncRes.Len);
+      GlobalTest(StringEqualsString(ReEncRes, Out));
+      
+      gs_string ReDecRes = {};
+      ReDecRes.Data = Decode_Base64Alloc(EncRes.Data, EncRes.Len,
+                                         &ReDecRes.Len, &Scratch);
+      GlobalTest(In.Len == ReDecRes.Len);
+      GlobalTest(StringEqualsString(ReDecRes, In));
+    }
+  }
+  
+  MemoryArenaClear(&Scratch);
+  TestGroup("SHA1 + Base64 Encoding")
+  {
+    // From: https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
+    
+    gs_string In = LitStr("dGhlIHNhbXBsZSBub25jZQ==258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+    u32 SHAHashRes[5] = {
+      0xb37a4f2c,
+      0xc0624f16,
+      0x90f64606,
+      0xcf385945,
+      0xb2bec4ea,
+    };
+    gs_string Out = LitStr("s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+    
+    gs_sha1_ctx SHA;
+    SHA1Reset(&SHA);
+    SHA1Input(&SHA, In.Data, In.Len);
+    GlobalTest(SHA1Result(&SHA) != 0);
+    GlobalTest(SHA.MsgDigest[0] == SHAHashRes[0]);
+    GlobalTest(SHA.MsgDigest[1] == SHAHashRes[1]);
+    GlobalTest(SHA.MsgDigest[2] == SHAHashRes[2]);
+    GlobalTest(SHA.MsgDigest[3] == SHAHashRes[3]);
+    GlobalTest(SHA.MsgDigest[4] == SHAHashRes[4]);
+    
+    u32 SHAHashResEndianSwapped[5] = {
+      EndianSwapU32(SHA.MsgDigest[0]),
+      EndianSwapU32(SHA.MsgDigest[1]),
+      EndianSwapU32(SHA.MsgDigest[2]),
+      EndianSwapU32(SHA.MsgDigest[3]),
+      EndianSwapU32(SHA.MsgDigest[4]),
+    };
+    
+    gs_string Res = {};
+    Res.Data = Encode_Base64Alloc((u8*)SHAHashResEndianSwapped, 20, &Res.Len, &Scratch);
+    
+    GlobalTest(StringEqualsString(Res, Out));
   }
 }
