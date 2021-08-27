@@ -289,4 +289,14 @@ TokenConcat(gs_token Start, gs_token End)
   Result.Len = (End.Str.Data + End.Str.Len) - Result.Data;
   return Result;
 }
+internal gs_string
+TokenConcatCopy(gs_token Start, gs_token End, gs_memory_arena* Arena)
+{
+  gs_string Staging = TokenConcat(Start, End);
+  gs_string Result = PushString(Arena, Staging.Len + 1);
+  StringCopy(Staging, &Result);
+  Result.Data[Result.Len] = 0;
+  return Result;
+}
+
 #endif //GS_TOKENIZER_H
