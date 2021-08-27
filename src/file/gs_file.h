@@ -353,6 +353,26 @@ FileSeek(gs_file_handler F, gs_file_handle* Handle, enum gs_file_landmark Base, 
   return Result;
 }
 
+internal u64
+FileGetSize(gs_file_handler F, gs_file_handle* Handle, gs_file_error* ErrorOut)
+{
+  if (!FileHandleIsValid(*Handle)) {
+    *ErrorOut = FileError_InvalidHandle;
+    return 0;
+  }
+  
+  if (FileSeek(F, Handle, FileLandmark_End, 0, ErrorOut))
+  {
+    s64 Size = FileTell(F, Handle, ErrorOut);
+    FileSeek(F, Handle, FileLandmark_Start, 0, ErrorOut);
+    if (*ErrorOut == FileError_NoError)
+    {
+      return Size;
+    }
+  }
+  return 0;
+}
+
 internal bool
 FileDelete(gs_file_handler F, char* Path, u8 Flags, gs_file_error* ErrorOut)
 {
@@ -386,6 +406,13 @@ FileReadAllAndClose(gs_file_handler F, char* Path, gs_memory_arena* Arena, gs_fi
         if (ReadAmount == (u64)Size)
         {
           Result.Memory[ReadAmount] = 0;
+          
+          // NOTE(PS): PushSize might have to align things
+          // forward, making Size bigger than the actual
+          // file size. This makes some file operations 
+          // annoying, so we just reset it here to the 
+          // file's actual size.
+          Result.Size = ReadAmount;
         }
         else if (ErrorOut)
         {
