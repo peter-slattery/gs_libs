@@ -44,6 +44,7 @@ typedef struct str_list{
 str_list* SearchDirs = 0;
 str_list* Win32_BuildStr = 0;
 str_list* OSX_BuildStr = 0;
+str_list* WASM_BuildStr = 0;
 
 bool StrIsDir (char* Path, int Len)
 {
@@ -71,26 +72,30 @@ str_list* PushStrOnSearchList (int Length)
   return Next;
 }
 
-str_list* PushStrOnBuildString_OSX ()
+str_list* PushStrOnBuildString(str_list** BuildStr)
 {
   str_list* Next = AllocStr(2048);
-  if (OSX_BuildStr != 0) 
+  if (*BuildStr != 0) 
   {
-    Next->Next = OSX_BuildStr;
+    Next->Next = *BuildStr;
   }
-  OSX_BuildStr = Next;
+  *BuildStr = Next;
   return Next;
+}
+
+str_list* PushStrOnBuildString_OSX ()
+{
+  return PushStrOnBuildString(&OSX_BuildStr);
 }
 
 str_list* PushStrOnBuildString_Win32 ()
 {
-  str_list* Next = AllocStr(2048);
-  if (Win32_BuildStr != 0) 
-  {
-    Next->Next = Win32_BuildStr;
-  }
-  Win32_BuildStr = Next;
-  return Next;
+  return PushStrOnBuildString(&Win32_BuildStr);
+}
+
+str_list* PushStrOnBuildString_WASM ()
+{
+  return PushStrOnBuildString(&WASM_BuildStr);
 }
 
 char* CatDirs (str_list* Dest, char* ParentDir, int ParentDirLength, char* Dir, int DirLength)
@@ -218,6 +223,17 @@ void PushBuildString (char* TestFilePath, char* FileName)
   }
   At += sprintf(At, "echo.\n\n");
   
+  str_list* WASM_BuildString = PushStrOnBuildString_WASM();
+  At = WASM_BuildString->Str;
+  At += sprintf(At, "echo COMPILING %.*s...\n\n", LastPeriodIndex, FileName);
+  At += sprintf(At, "set TestFileNoExtensions=%.*s\n", LastPeriodIndex, FileName);
+  At += sprintf(At, "set TestFileFullPath=%s\n", TestFilePath);
+  for (int i = 0; i < BuildCommandsLength_WASM; i++)
+  {
+    At += sprintf(At, "%s", BuildCommands_WASM[i]);
+  }
+  At += sprintf(At, "echo.\n\n");
+  
 }
 
 void BuildTestBatchFile (char* SearchDir, char* ParentDir)
@@ -321,6 +337,14 @@ int main(int ArgCount, char** Args)
                   SetupCommands_OSX, SetupCommandsLength_OSX,
                   BuildCommands_OSX, BuildCommandsLength_OSX,
                   CleanupCommands_OSX, CleanupCommandsLength_OSX);
+  
+  FILE* OutputFileHandle_WASM = fopen("build_and_run_tests_wasm.bat", "w");
+  WriteOutputFile(
+                  OutputFileHandle_WASM, 
+                  WASM_BuildStr,
+                  SetupCommands_WASM, SetupCommandsLength_WASM,
+                  BuildCommands_WASM, BuildCommandsLength_WASM,
+                  CleanupCommands_WASM, CleanupCommandsLength_WASM);
   
   // Clean Up
   FreeAllSearchDirs();
